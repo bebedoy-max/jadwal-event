@@ -145,6 +145,12 @@ export function Footer() {
             <li>
               <Link to="/admin" className="hover:text-primary">Panel Admin</Link>
             </li>
+            <li>
+              <Link to="/privacy-policy" className="hover:text-primary">Kebijakan Privasi</Link>
+            </li>
+            <li>
+              <Link to="/terms-of-service" className="hover:text-primary">Syarat dan Ketentuan</Link>
+            </li>
           </ul>
         </div>
       </div>

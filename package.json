@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "build:cf": "NITRO_PRESET=cloudflare_pages vite build",
+    "build:cf": "NITRO_PRESET=cloudflare_pages vite build && node scripts/patch-cf-env.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",

@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CariRouteImport } from './routes/cari'
+import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminDriveRouteImport } from './routes/admin.drive'
 import { Route as AdminIklanRouteImport } from './routes/admin.iklan'
@@ -42,6 +44,16 @@ const AdminRoute = AdminRouteImport.update({
 const CariRoute = CariRouteImport.update({
   id: '/cari',
   path: '/cari',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
+  id: '/privacy-policy',
+  path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -101,6 +113,8 @@ export interface FileRoutesByFullPath {
   '/$slug': typeof SlugRoute
   '/admin': typeof AdminRouteWithChildren
   '/cari': typeof CariRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
@@ -116,6 +130,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/cari': typeof CariRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
@@ -133,6 +149,8 @@ export interface FileRoutesById {
   '/$slug': typeof SlugRoute
   '/admin': typeof AdminRouteWithChildren
   '/cari': typeof CariRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
@@ -151,6 +169,8 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/admin'
     | '/cari'
+    | '/privacy-policy'
+    | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
@@ -166,6 +186,8 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/cari'
+    | '/privacy-policy'
+    | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
@@ -182,6 +204,8 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/admin'
     | '/cari'
+    | '/privacy-policy'
+    | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
@@ -199,6 +223,8 @@ export interface RootRouteChildren {
   SlugRoute: typeof SlugRoute
   AdminRoute: typeof AdminRouteWithChildren
   CariRoute: typeof CariRoute
+  PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  TermsOfServiceRoute: typeof TermsOfServiceRoute
   KategoriSlugRoute: typeof KategoriSlugRoute
   TagSlugRoute: typeof TagSlugRoute
   ApiPublicGambarSplatRoute: typeof ApiPublicGambarSplatRoute
@@ -234,6 +260,20 @@ declare module '@tanstack/react-router' {
       path: '/cari'
       fullPath: '/cari'
       preLoaderRoute: typeof CariRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy-policy': {
+      id: '/privacy-policy'
+      path: '/privacy-policy'
+      fullPath: '/privacy-policy'
+      preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms-of-service': {
+      id: '/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof TermsOfServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -332,6 +372,8 @@ const rootRouteChildren: RootRouteChildren = {
   SlugRoute: SlugRoute,
   AdminRoute: AdminRouteWithChildren,
   CariRoute: CariRoute,
+  PrivacyPolicyRoute: PrivacyPolicyRoute,
+  TermsOfServiceRoute: TermsOfServiceRoute,
   KategoriSlugRoute: KategoriSlugRoute,
   TagSlugRoute: TagSlugRoute,
   ApiPublicGambarSplatRoute: ApiPublicGambarSplatRoute,

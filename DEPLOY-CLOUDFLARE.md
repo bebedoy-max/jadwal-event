@@ -80,3 +80,12 @@ npx wrangler pages dev dist --compatibility-flag nodejs_compat
 
 Untuk uji lokal, taruh nilai environment variable di `.dev.vars` (sudah
 diabaikan git). Lihat `.dev.vars.example`.
+
+## 6. Catatan: patch environment variable (penting)
+
+Entri Worker bawaan Nitro untuk Cloudflare Pages tidak meneruskan binding
+environment ke `process.env`, sehingga situs terlihat "database belum aktif"
+walau env var sudah diisi. Karena itu `bun run build:cf` menjalankan
+`scripts/patch-cf-env.mjs` setelah build untuk menambahkan satu baris
+(`globalThis.__env__ = env;`) pada entri Worker. Jangan hapus langkah ini dari
+build command.
