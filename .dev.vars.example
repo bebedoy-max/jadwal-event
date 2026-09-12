@@ -1,0 +1,12 @@
+# Contoh isi .dev.vars (untuk `wrangler pages dev`) atau .env lokal.
+# Salin ke .dev.vars lalu isi nilainya. Jangan commit berkas aslinya.
+
+SELFHOST_SB_URL="https://sb.domainanda.com"
+SELFHOST_SB_PUBLISHABLE_KEY=""
+SELFHOST_SB_SERVICE_ROLE_KEY=""
+
+# Hanya perlu selama migrasi gambar lama belum selesai.
+FM_BASE_URL=""
+FM_ROOT=""
+FM_USER=""
+FM_PASS=""
