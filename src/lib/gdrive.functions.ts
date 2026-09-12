@@ -318,3 +318,28 @@ async function findAssetSafe(path: string) {
   );
   return rows[0] ?? null;
 }
+
+/* ---------------- Pemindahan besar yang bisa dilanjutkan ---------------- */
+
+import { runSync, syncStatus } from './sync.server';
+
+/** Posisi terakhir pemindahan + jumlah berkas yang sudah ada di Drive. */
+export const driveSyncStatus = createServerFn({ method: 'POST' })
+  .inputValidator((d: { token: string }) => d)
+  .handler(async ({ data }) => {
+    await requireAdmin(data.token);
+    return syncStatus();
+  });
+
+/** Menjalankan satu putaran pemindahan (±35 detik) lalu menyimpan posisinya. */
+export const driveSyncRun = createServerFn({ method: 'POST' })
+  .inputValidator((d: { token: string; reset?: boolean; articles?: boolean; batch?: number }) => d)
+  .handler(async ({ data }) => {
+    await requireAdmin(data.token);
+    return runSync({
+      reset: data.reset === true,
+      articles: data.articles !== false,
+      batch: data.batch ?? 6,
+      budgetMs: 35_000,
+    });
+  });

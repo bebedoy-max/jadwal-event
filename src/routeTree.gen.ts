@@ -22,6 +22,7 @@ import { Route as AdminKomentarRouteImport } from './routes/admin.komentar'
 import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
 import { Route as TagSlugRouteImport } from './routes/tag.$slug'
 import { Route as AdminTulisIdRouteImport } from './routes/admin.tulis.$id'
+import { Route as ApiPublicDriveSyncRouteImport } from './routes/api/public/drive-sync'
 import { Route as ApiPublicGambarSplatRouteImport } from './routes/api/public/gambar.$'
 import { Route as ApiPublicGoogleDriveCallbackRouteImport } from './routes/api/public/google-drive/callback'
 import { Route as ApiPublicMediaSplatRouteImport } from './routes/api/public/media.$'
@@ -91,6 +92,11 @@ const AdminTulisIdRoute = AdminTulisIdRouteImport.update({
   path: '/tulis/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicDriveSyncRoute = ApiPublicDriveSyncRouteImport.update({
+  id: '/api/public/drive-sync',
+  path: '/api/public/drive-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicGambarSplatRoute = ApiPublicGambarSplatRouteImport.update({
   id: '/api/public/gambar/$',
   path: '/api/public/gambar/$',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/tag/$slug': typeof TagSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
+  '/api/public/drive-sync': typeof ApiPublicDriveSyncRoute
   '/api/public/gambar/$': typeof ApiPublicGambarSplatRoute
   '/api/public/google-drive/callback': typeof ApiPublicGoogleDriveCallbackRoute
   '/api/public/media/$': typeof ApiPublicMediaSplatRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/tag/$slug': typeof TagSlugRoute
   '/admin': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
+  '/api/public/drive-sync': typeof ApiPublicDriveSyncRoute
   '/api/public/gambar/$': typeof ApiPublicGambarSplatRoute
   '/api/public/google-drive/callback': typeof ApiPublicGoogleDriveCallbackRoute
   '/api/public/media/$': typeof ApiPublicMediaSplatRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/tag/$slug': typeof TagSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
+  '/api/public/drive-sync': typeof ApiPublicDriveSyncRoute
   '/api/public/gambar/$': typeof ApiPublicGambarSplatRoute
   '/api/public/google-drive/callback': typeof ApiPublicGoogleDriveCallbackRoute
   '/api/public/media/$': typeof ApiPublicMediaSplatRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/tag/$slug'
     | '/admin/'
     | '/admin/tulis/$id'
+    | '/api/public/drive-sync'
     | '/api/public/gambar/$'
     | '/api/public/google-drive/callback'
     | '/api/public/media/$'
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
     | '/tag/$slug'
     | '/admin'
     | '/admin/tulis/$id'
+    | '/api/public/drive-sync'
     | '/api/public/gambar/$'
     | '/api/public/google-drive/callback'
     | '/api/public/media/$'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/tag/$slug'
     | '/admin/'
     | '/admin/tulis/$id'
+    | '/api/public/drive-sync'
     | '/api/public/gambar/$'
     | '/api/public/google-drive/callback'
     | '/api/public/media/$'
@@ -227,6 +239,7 @@ export interface RootRouteChildren {
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   KategoriSlugRoute: typeof KategoriSlugRoute
   TagSlugRoute: typeof TagSlugRoute
+  ApiPublicDriveSyncRoute: typeof ApiPublicDriveSyncRoute
   ApiPublicGambarSplatRoute: typeof ApiPublicGambarSplatRoute
   ApiPublicGoogleDriveCallbackRoute: typeof ApiPublicGoogleDriveCallbackRoute
   ApiPublicMediaSplatRoute: typeof ApiPublicMediaSplatRoute
@@ -325,6 +338,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTulisIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/drive-sync': {
+      id: '/api/public/drive-sync'
+      path: '/api/public/drive-sync'
+      fullPath: '/api/public/drive-sync'
+      preLoaderRoute: typeof ApiPublicDriveSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/gambar/$': {
       id: '/api/public/gambar/$'
       path: '/api/public/gambar/$'
@@ -376,6 +396,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsOfServiceRoute: TermsOfServiceRoute,
   KategoriSlugRoute: KategoriSlugRoute,
   TagSlugRoute: TagSlugRoute,
+  ApiPublicDriveSyncRoute: ApiPublicDriveSyncRoute,
   ApiPublicGambarSplatRoute: ApiPublicGambarSplatRoute,
   ApiPublicGoogleDriveCallbackRoute: ApiPublicGoogleDriveCallbackRoute,
   ApiPublicMediaSplatRoute: ApiPublicMediaSplatRoute,

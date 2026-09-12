@@ -1,12 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   driveAuthUrl,
   driveList,
   driveMigrateBatch,
   driveSave,
   driveSetState,
-  driveSyncBatch,
+  driveSyncRun,
+  driveSyncStatus,
   driveUpload,
   type DriveAccountView,
 } from '@/lib/gdrive.functions';
@@ -15,6 +16,8 @@ import { ensureToken } from '@/lib/useAdminToken';
 export const Route = createFileRoute('/admin/drive')({ component: AdminDrive });
 
 type Form = { id?: string; label: string; client_id: string; client_secret: string; root_folder_name: string };
+
+type SyncStatus = Awaited<ReturnType<typeof driveSyncStatus>>;
 
 const EMPTY: Form = { label: 'Google Drive', client_id: '', client_secret: '', root_folder_name: 'Media Situs' };
 
@@ -32,6 +35,8 @@ function AdminDrive() {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState('');
   const [backupArticles, setBackupArticles] = useState(true);
+  const [status, setStatus] = useState<SyncStatus | null>(null);
+  const stopRef = useRef(false);
 
   const active = accounts.find((a) => a.is_active && a.enabled);
   const canSync = Boolean(active?.connected);
@@ -47,10 +52,17 @@ function AdminDrive() {
     setRedirectUri(res.redirectUri);
   };
 
+  const loadStatus = async () => {
+    const token = await ensureToken();
+    if (!token) return;
+    setStatus(await driveSyncStatus({ data: { token } }));
+  };
+
   useEffect(() => {
     load().catch((e: unknown) =>
       setErr(e instanceof Error ? e.message : 'Gagal memuat data Google Drive.'),
     );
+    loadStatus().catch(() => undefined);
     const onMsg = (e: MessageEvent) => {
       if (e.origin === window.location.origin && e.data?.type === 'gdriveConnected') {
         setMsg('Akun Google Drive berhasil terhubung.');
@@ -118,46 +130,51 @@ function AdminDrive() {
     }
   };
 
-  const syncAll = async () => {
+  const syncAll = async (reset: boolean) => {
     if (
-      !confirm(
-        'Salin semua gambar/video di seluruh artikel ke Google Drive aktif? Proses berjalan bertahap dan bisa lama.',
-      )
+      reset &&
+      !confirm('Mulai pemindahan dari artikel pertama lagi? Berkas yang sudah ada tidak diunggah ulang.')
     )
       return;
     setSyncing(true);
+    stopRef.current = false;
     setErr('');
     setMsg('');
     setSyncProgress('Memulai…');
-    let offset = 0;
-    let up = 0;
-    let skip = 0;
-    let miss = 0;
-    let arts = 0;
     try {
+      let first = reset;
       for (;;) {
-        const res = await driveSyncBatch({
-          data: { token: await ensureToken(), offset, posts: 10, articles: backupArticles },
+        const res = await driveSyncRun({
+          data: { token: await ensureToken(), reset: first, articles: backupArticles, batch: 6 },
         });
-        up += res.uploaded;
-        skip += res.skipped;
-        miss += res.missing;
-        arts += res.articles;
-        offset = res.next;
+        first = false;
+        setStatus({
+          offset: res.offset,
+          total: res.total,
+          files: status?.files ?? 0,
+          done: res.done,
+          stats: res.stats,
+        });
         setSyncProgress(
-          `${offset}/${res.total} artikel · ${up} baru disalin · ${skip} sudah ada · ${miss} tidak ditemukan${backupArticles ? ` · ${arts} cadangan artikel` : ''}`,
+          `${res.offset.toLocaleString('id-ID')}/${res.total.toLocaleString('id-ID')} artikel diproses…`,
         );
-        if (res.errors.length) setErr(res.errors.join(' · '));
-        if (res.done) break;
+        if (res.stats.lastError) setErr(res.stats.lastError);
+        if (res.done) {
+          setMsg('Pemindahan selesai. Semua artikel sudah diproses.');
+          break;
+        }
+        if (stopRef.current) {
+          setMsg('Pemindahan dihentikan. Posisi tersimpan, tinggal klik "Lanjutkan pemindahan".');
+          break;
+        }
       }
-      setMsg(
-        `Pemindahan selesai: ${up} berkas baru disalin ke Drive, ${skip} sudah ada, ${miss} tidak ditemukan di sumber lama.`,
-      );
+      await loadStatus();
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Pemindahan gagal.');
     } finally {
       setSyncing(false);
+      setSyncProgress('');
     }
   };
 
@@ -360,11 +377,37 @@ function AdminDrive() {
 
       {/* Sinkronisasi semua media ke Drive */}
       <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="mb-1 font-semibold">Pindahkan semua media ke Drive</h2>
+        <h2 className="mb-1 font-semibold">Pindahkan semua isi situs ke Drive</h2>
         <p className="mb-3 text-sm text-muted-foreground">
-          Menyalin semua gambar dan video di seluruh artikel ke akun Drive aktif
-          {active ? ` (${active.label})` : ''}. Alamat gambar di situs tidak berubah.
+          Menyalin semua gambar, video, dan cadangan artikel ke akun Drive aktif
+          {active ? ` (${active.label})` : ''}. Proses berjalan bertahap dan selalu melanjutkan dari
+          posisi terakhir, jadi boleh dihentikan lalu diteruskan kapan saja.
         </p>
+        {status && (
+          <div className="mb-3 rounded-md bg-muted p-3 text-sm">
+            <p>
+              Artikel diproses: <strong>{status.offset.toLocaleString('id-ID')}</strong> dari{' '}
+              {status.total.toLocaleString('id-ID')} · berkas di Drive:{' '}
+              <strong>{status.files.toLocaleString('id-ID')}</strong>
+            </p>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-background">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{
+                  width: `${status.total ? Math.min(100, (status.offset / status.total) * 100) : 0}%`,
+                }}
+              />
+            </div>
+            {status.stats.updatedAt && (
+              <p className="mt-2 text-muted-foreground">
+                {status.stats.uploaded.toLocaleString('id-ID')} berkas baru ·{' '}
+                {status.stats.articles.toLocaleString('id-ID')} cadangan artikel ·{' '}
+                {status.stats.missing.toLocaleString('id-ID')} tidak ditemukan
+              </p>
+            )}
+            {status.done && <p className="mt-1 text-primary">Semua artikel sudah diproses.</p>}
+          </div>
+        )}
         <label className="mb-3 flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -374,14 +417,34 @@ function AdminDrive() {
           />
           Simpan juga cadangan isi artikel (berkas HTML) di Drive
         </label>
-        <button
-          disabled={syncing || busy || !canSync}
-          title={canSync ? '' : 'Hubungkan dan aktifkan akun Google Drive dulu'}
-          onClick={() => void syncAll()}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground disabled:opacity-60"
-        >
-          {syncing ? 'Memindahkan…' : 'Pindahkan semua media ke Drive'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            disabled={syncing || busy || !canSync}
+            title={canSync ? '' : 'Hubungkan dan aktifkan akun Google Drive dulu'}
+            onClick={() => void syncAll(false)}
+            className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground disabled:opacity-60"
+          >
+            {syncing ? 'Memindahkan…' : 'Lanjutkan pemindahan'}
+          </button>
+          {syncing && (
+            <button
+              onClick={() => {
+                stopRef.current = true;
+                setSyncProgress('Berhenti setelah putaran ini selesai…');
+              }}
+              className="rounded-md border border-border px-4 py-1.5 text-sm"
+            >
+              Hentikan
+            </button>
+          )}
+          <button
+            disabled={syncing || busy || !canSync}
+            onClick={() => void syncAll(true)}
+            className="rounded-md border border-border px-4 py-1.5 text-sm disabled:opacity-60"
+          >
+            Ulang dari awal
+          </button>
+        </div>
         {!canSync && (
           <p className="mt-2 text-sm text-muted-foreground">
             Tombol aktif setelah ada akun Drive yang terhubung ke Google dan berstatus aktif.

@@ -157,6 +157,18 @@ export const adminSavePost = createServerFn({ method: 'POST' })
         });
       }
     }
+    // Cadangkan isi artikel sebagai berkas HTML di Google Drive aktif.
+    try {
+      const { activeAccount, ingestText } = await import('./gdrive.server');
+      const acc = await activeAccount();
+      if (acc?.refresh_token) {
+        const html = `<!doctype html><meta charset="utf-8"><title>${body.title}</title>\n<!-- slug: ${slug} | id: ${id} -->\n<h1>${body.title}</h1>\n<p>${body.excerpt}</p>\n${body.content}`;
+        await ingestText(acc, `artikel/${slug}.html`, html);
+      }
+    } catch {
+      /* cadangan gagal tidak boleh membatalkan penyimpanan artikel */
+    }
+
     return { id, slug };
   });
 

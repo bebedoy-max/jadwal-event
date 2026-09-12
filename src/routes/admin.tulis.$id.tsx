@@ -1,7 +1,17 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { adminGetPost, adminSavePost } from '@/lib/admin.functions';
+import { driveUpload } from '@/lib/gdrive.functions';
 import { getToken } from '@/lib/useAdminToken';
+
+async function toBase64(file: File) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < buf.length; i += 8192) {
+    bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+  }
+  return btoa(bin);
+}
 
 export const Route = createFileRoute('/admin/tulis/$id')({ component: Editor });
 
@@ -18,6 +28,31 @@ function Editor() {
   const [status, setStatus] = useState('publish');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const [uploading, setUploading] = useState(false);
+
+  /** Unggah berkas ke Google Drive aktif, lalu pakai alamatnya di artikel. */
+  const upload = async (file: File, target: 'utama' | 'isi') => {
+    setUploading(true);
+    setMsg('');
+    try {
+      const { url } = await driveUpload({
+        data: {
+          token: getToken(),
+          name: file.name,
+          mime: file.type || 'application/octet-stream',
+          dataBase64: await toBase64(file),
+        },
+      });
+      if (target === 'utama') setImage(url);
+      else setContent((c) => `${c}\n<figure><img src="${url}" alt="${file.name}" /></figure>\n`);
+      setMsg('Berkas tersimpan di Google Drive.');
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : 'Unggah gagal.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (isNew) return;
@@ -85,6 +120,41 @@ function Editor() {
           className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
         />
       </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-md border border-dashed border-border p-3 text-sm">
+        <span className="text-muted-foreground">
+          {uploading ? 'Mengunggah ke Google Drive…' : 'Unggah gambar/video ke Google Drive:'}
+        </span>
+        <label className="cursor-pointer rounded-md border border-border px-3 py-1.5">
+          Jadikan gambar utama
+          <input
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void upload(f, 'utama');
+            }}
+          />
+        </label>
+        <label className="cursor-pointer rounded-md border border-border px-3 py-1.5">
+          Sisipkan ke isi artikel
+          <input
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void upload(f, 'isi');
+            }}
+          />
+        </label>
+      </div>
+
       <textarea
         value={excerpt}
         onChange={(e) => setExcerpt(e.target.value)}
