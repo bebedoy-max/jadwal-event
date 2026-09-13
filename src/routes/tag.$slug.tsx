@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { listPosts, popularPosts } from '@/lib/content.functions';
 import { Pagination, PostCard, Sidebar } from '@/components/site';
+import { abs } from '@/lib/site';
 
 export const Route = createFileRoute('/tag/$slug')({
   validateSearch: (s: Record<string, unknown>): { page?: number | undefined } => ({
@@ -22,9 +23,10 @@ export const Route = createFileRoute('/tag/$slug')({
       };
     }
   },
-  head: ({ loaderData }) => {
+  head: ({ params, loaderData }) => {
     const name = loaderData?.list.tag?.name ?? loaderData?.slug ?? 'Tag';
     const desc = `Artikel dan jadwal event dengan tag ${name}.`;
+    const url = abs(`/tag/${params.slug}`);
     return {
       meta: [
         { title: `Tag: ${name} | JadwalEvent`.slice(0, 65) },
@@ -32,8 +34,10 @@ export const Route = createFileRoute('/tag/$slug')({
         { property: 'og:title', content: `Tag: ${name}` },
         { property: 'og:description', content: desc },
         { property: 'og:type', content: 'website' },
+        { property: 'og:url', content: url },
         { name: 'twitter:card', content: 'summary_large_image' },
       ],
+      links: [{ rel: 'canonical', href: url }],
     };
   },
   component: TagPage,

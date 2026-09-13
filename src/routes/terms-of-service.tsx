@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { abs } from '@/lib/site';
 
 export const Route = createFileRoute('/terms-of-service')({
   head: () => ({
@@ -15,8 +16,10 @@ export const Route = createFileRoute('/terms-of-service')({
         content: 'Syarat dan ketentuan penggunaan situs JadwalEvent.',
       },
       { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: abs('/terms-of-service') },
       { name: 'twitter:card', content: 'summary' },
     ],
+    links: [{ rel: 'canonical', href: abs('/terms-of-service') }],
   }),
   component: TermsOfServicePage,
 });

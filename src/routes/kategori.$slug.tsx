@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { listPosts, popularPosts } from '@/lib/content.functions';
 import { Pagination, PostCard, Sidebar } from '@/components/site';
+import { abs } from '@/lib/site';
 
 export const Route = createFileRoute('/kategori/$slug')({
   validateSearch: (s: Record<string, unknown>): { page?: number | undefined } => ({
@@ -22,9 +23,10 @@ export const Route = createFileRoute('/kategori/$slug')({
       };
     }
   },
-  head: ({ loaderData }) => {
+  head: ({ params, loaderData }) => {
     const name = loaderData?.list.category?.name ?? 'Kategori';
     const desc = `Kumpulan info dan jadwal event kategori ${name} terbaru di Indonesia.`;
+    const url = abs(`/kategori/${params.slug}`);
     return {
       meta: [
         { title: `Event ${name} Terbaru | JadwalEvent`.slice(0, 65) },
@@ -32,8 +34,10 @@ export const Route = createFileRoute('/kategori/$slug')({
         { property: 'og:title', content: `Event ${name} Terbaru` },
         { property: 'og:description', content: desc },
         { property: 'og:type', content: 'website' },
+        { property: 'og:url', content: url },
         { name: 'twitter:card', content: 'summary_large_image' },
       ],
+      links: [{ rel: 'canonical', href: url }],
     };
   },
   component: CategoryPage,

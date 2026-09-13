@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { sbJson, sbList } from './sb.server';
 import { fixMediaUrls } from './media';
+import { cleanArticleHtml, cleanExcerpt } from './html';
 
 export type PostCard = {
   id: number;
@@ -91,6 +92,8 @@ export const getPost = createServerFn({ method: 'GET' })
     >(
       `/rest/v1/comments?select=id,author_name,content,created_at&post_id=eq.${post.id}&status=eq.approved&order=created_at.asc`,
     );
+    post.content = cleanArticleHtml(post.content);
+    post.excerpt = cleanExcerpt(post.excerpt);
     return fixMediaUrls({ post, related, comments });
   });
 

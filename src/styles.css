@@ -181,6 +181,17 @@
 }
 .article-body table { width: 100%; border-collapse: collapse; margin: 1rem 0; display: block; overflow-x: auto; }
 .article-body td, .article-body th { border: 1px solid var(--border); padding: .5rem .65rem; }
+.article-body hr { border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+/* Tombol warisan WordPress agar tampil sebagai tombol, bukan tautan biasa */
+.article-body .wp-block-buttons {
+  display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; margin: 1.25rem 0;
+}
+.article-body .wp-block-button__link {
+  display: inline-block; text-decoration: none; font-weight: 600;
+  background: var(--primary); color: var(--primary-foreground);
+  padding: .6rem 1.25rem; border-radius: .5rem;
+}
+.article-body .wp-block-button__link:hover { opacity: .9; }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 

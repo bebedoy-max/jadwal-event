@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { abs } from '@/lib/site';
 
 export const Route = createFileRoute('/privacy-policy')({
   head: () => ({
@@ -15,8 +16,10 @@ export const Route = createFileRoute('/privacy-policy')({
         content: 'Kebijakan privasi JadwalEvent mengenai pengumpulan dan penggunaan data pengguna.',
       },
       { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: abs('/privacy-policy') },
       { name: 'twitter:card', content: 'summary' },
     ],
+    links: [{ rel: 'canonical', href: abs('/privacy-policy') }],
   }),
   component: PrivacyPolicyPage,
 });

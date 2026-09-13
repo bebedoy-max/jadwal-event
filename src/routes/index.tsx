@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { listPosts, popularPosts } from '@/lib/content.functions';
 import { AdSlot, Pagination, PostCard, Sidebar } from '@/components/site';
+import { abs } from '@/lib/site';
 
 export const Route = createFileRoute('/')({
   validateSearch: (s: Record<string, unknown>): { page?: number | undefined } => ({
@@ -36,7 +37,25 @@ export const Route = createFileRoute('/')({
         content: 'Informasi jadwal event, pameran, seminar, promo, bazaar, workshop dan lomba terbaru.',
       },
       { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: abs('/') },
       { name: 'twitter:card', content: 'summary_large_image' },
+    ],
+    links: [{ rel: 'canonical', href: abs('/') }],
+    scripts: [
+      {
+        type: 'application/ld+json',
+        children: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'JadwalEvent',
+          url: abs('/'),
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: abs('/cari?q={search_term_string}'),
+            'query-input': 'required name=search_term_string',
+          },
+        }),
+      },
     ],
   }),
   component: Home,
@@ -59,7 +78,7 @@ function Home() {
             </p>
           )}
           <h1 className="mb-5 border-l-4 border-primary pl-3 font-display text-2xl font-bold uppercase">
-            Event Terbaru
+            Jadwal Event Terkini di Indonesia
           </h1>
           {lead && (
             <div className="mb-6">

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { listPosts, popularPosts } from '@/lib/content.functions';
 import { Pagination, PostCard, Sidebar } from '@/components/site';
+import { abs } from '@/lib/site';
 
 export const Route = createFileRoute('/cari')({
   validateSearch: (s: Record<string, unknown>): { q?: string | undefined; page?: number | undefined } => ({
@@ -30,8 +31,11 @@ export const Route = createFileRoute('/cari')({
       { property: 'og:title', content: `Hasil pencarian: ${loaderData?.q ?? ''}` },
       { property: 'og:description', content: 'Cari jadwal event, pameran, dan promo terbaru.' },
       { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: abs('/cari') },
+      { name: 'robots', content: 'noindex, follow' },
       { name: 'twitter:card', content: 'summary_large_image' },
     ],
+    links: [{ rel: 'canonical', href: abs('/cari') }],
   }),
   component: SearchPage,
   errorComponent: () => (

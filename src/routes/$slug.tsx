@@ -2,6 +2,7 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { useState } from 'react';
 import { getPost, popularPosts, submitComment } from '@/lib/content.functions';
 import { AdSlot, PostCard, Sidebar, formatDate } from '@/components/site';
+import { abs } from '@/lib/site';
 
 export const Route = createFileRoute('/$slug')({
   loader: async ({ params }) => {
@@ -12,10 +13,12 @@ export const Route = createFileRoute('/$slug')({
     if (!data) throw notFound();
     return { ...data, popular };
   },
-  head: ({ loaderData }) => {
+  head: ({ params, loaderData }) => {
     const p = loaderData?.post;
+    const url = abs(`/${params.slug}`);
     if (!p) return {};
     const desc = (p.excerpt || p.title).slice(0, 155);
+    const img = p.featured_image?.startsWith('https://') ? p.featured_image : undefined;
     return {
       meta: [
         { title: `${p.title} | JadwalEvent`.slice(0, 65) },
@@ -23,13 +26,42 @@ export const Route = createFileRoute('/$slug')({
         { property: 'og:title', content: p.title },
         { property: 'og:description', content: desc },
         { property: 'og:type', content: 'article' },
+        { property: 'og:url', content: url },
         { name: 'twitter:card', content: 'summary_large_image' },
-        ...(p.featured_image?.startsWith('https://')
+        ...(img
           ? [
-              { property: 'og:image', content: p.featured_image },
-              { name: 'twitter:image', content: p.featured_image },
+              { property: 'og:image', content: img },
+              { name: 'twitter:image', content: img },
             ]
           : []),
+      ],
+      links: [{ rel: 'canonical', href: url }],
+      scripts: [
+        {
+          type: 'application/ld+json',
+          children: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@graph': [
+              {
+                '@type': 'Article',
+                headline: p.title,
+                description: desc,
+                datePublished: p.published_at,
+                mainEntityOfPage: url,
+                ...(img ? { image: [img] } : {}),
+                author: { '@type': 'Person', name: p.author_name || 'JadwalEvent' },
+                publisher: { '@type': 'Organization', name: 'JadwalEvent' },
+              },
+              {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  { '@type': 'ListItem', position: 1, name: 'Beranda', item: abs('/') },
+                  { '@type': 'ListItem', position: 2, name: p.title, item: url },
+                ],
+              },
+            ],
+          }),
+        },
       ],
     };
   },

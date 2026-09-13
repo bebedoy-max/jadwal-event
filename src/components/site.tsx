@@ -143,6 +143,16 @@ export function Footer() {
               <Link to="/" className="hover:text-primary">Beranda</Link>
             </li>
             <li>
+              <Link to="/$slug" params={{ slug: 'fitur-submit-event' }} className="hover:text-primary">
+                Paket Submit Event
+              </Link>
+            </li>
+            <li>
+              <Link to="/$slug" params={{ slug: 'beriklan-di-jadwal-event' }} className="hover:text-primary">
+                Beriklan / Advertorial
+              </Link>
+            </li>
+            <li>
               <Link to="/admin" className="hover:text-primary">Panel Admin</Link>
             </li>
             <li>

@@ -14,12 +14,14 @@ import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CariRouteImport } from './routes/cari'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminDriveRouteImport } from './routes/admin.drive'
 import { Route as AdminIklanRouteImport } from './routes/admin.iklan'
 import { Route as AdminKomentarRouteImport } from './routes/admin.komentar'
 import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
+import { Route as SitemapPartDotxmlRouteImport } from './routes/sitemap/$part[.]xml'
 import { Route as TagSlugRouteImport } from './routes/tag.$slug'
 import { Route as AdminTulisIdRouteImport } from './routes/admin.tulis.$id'
 import { Route as ApiPublicDriveSyncRouteImport } from './routes/api/public/drive-sync'
@@ -52,6 +54,11 @@ const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
   path: '/privacy-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
   id: '/terms-of-service',
   path: '/terms-of-service',
@@ -80,6 +87,11 @@ const AdminKomentarRoute = AdminKomentarRouteImport.update({
 const KategoriSlugRoute = KategoriSlugRouteImport.update({
   id: '/kategori/$slug',
   path: '/kategori/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapPartDotxmlRoute = SitemapPartDotxmlRouteImport.update({
+  id: '/sitemap/$part.xml',
+  path: '/sitemap/$part.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TagSlugRoute = TagSlugRouteImport.update({
@@ -120,11 +132,13 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/cari': typeof CariRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
   '/kategori/$slug': typeof KategoriSlugRoute
+  '/sitemap/$part.xml': typeof SitemapPartDotxmlRoute
   '/tag/$slug': typeof TagSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
@@ -138,11 +152,13 @@ export interface FileRoutesByTo {
   '/$slug': typeof SlugRoute
   '/cari': typeof CariRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
   '/kategori/$slug': typeof KategoriSlugRoute
+  '/sitemap/$part.xml': typeof SitemapPartDotxmlRoute
   '/tag/$slug': typeof TagSlugRoute
   '/admin': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
@@ -158,11 +174,13 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/cari': typeof CariRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
   '/kategori/$slug': typeof KategoriSlugRoute
+  '/sitemap/$part.xml': typeof SitemapPartDotxmlRoute
   '/tag/$slug': typeof TagSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
@@ -179,11 +197,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cari'
     | '/privacy-policy'
+    | '/sitemap.xml'
     | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
     | '/kategori/$slug'
+    | '/sitemap/$part.xml'
     | '/tag/$slug'
     | '/admin/'
     | '/admin/tulis/$id'
@@ -197,11 +217,13 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/cari'
     | '/privacy-policy'
+    | '/sitemap.xml'
     | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
     | '/kategori/$slug'
+    | '/sitemap/$part.xml'
     | '/tag/$slug'
     | '/admin'
     | '/admin/tulis/$id'
@@ -216,11 +238,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cari'
     | '/privacy-policy'
+    | '/sitemap.xml'
     | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
     | '/kategori/$slug'
+    | '/sitemap/$part.xml'
     | '/tag/$slug'
     | '/admin/'
     | '/admin/tulis/$id'
@@ -236,8 +260,10 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   CariRoute: typeof CariRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   KategoriSlugRoute: typeof KategoriSlugRoute
+  SitemapPartDotxmlRoute: typeof SitemapPartDotxmlRoute
   TagSlugRoute: typeof TagSlugRoute
   ApiPublicDriveSyncRoute: typeof ApiPublicDriveSyncRoute
   ApiPublicGambarSplatRoute: typeof ApiPublicGambarSplatRoute
@@ -282,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terms-of-service': {
       id: '/terms-of-service'
       path: '/terms-of-service'
@@ -322,6 +355,13 @@ declare module '@tanstack/react-router' {
       path: '/kategori/$slug'
       fullPath: '/kategori/$slug'
       preLoaderRoute: typeof KategoriSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap/$part.xml': {
+      id: '/sitemap/$part.xml'
+      path: '/sitemap/$part.xml'
+      fullPath: '/sitemap/$part.xml'
+      preLoaderRoute: typeof SitemapPartDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tag/$slug': {
@@ -393,8 +433,10 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   CariRoute: CariRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
   KategoriSlugRoute: KategoriSlugRoute,
+  SitemapPartDotxmlRoute: SitemapPartDotxmlRoute,
   TagSlugRoute: TagSlugRoute,
   ApiPublicDriveSyncRoute: ApiPublicDriveSyncRoute,
   ApiPublicGambarSplatRoute: ApiPublicGambarSplatRoute,
