@@ -58,6 +58,40 @@ export async function insertAccount(body: Record<string, unknown>) {
   return rows[0]!;
 }
 
+/* ---------------- Konfigurasi Google master ---------------- */
+
+/**
+ * Client ID/Secret OAuth disimpan sekali sebagai baris khusus (id tetap).
+ * Akun-akun Drive lain menyalin kredensial ini saat dibuat.
+ */
+export const CONFIG_ID = '00000000-0000-0000-0000-000000000000';
+
+export function getMasterConfig() {
+  return getAccount(CONFIG_ID);
+}
+
+export async function saveMasterConfig(clientId: string, clientSecret: string | null) {
+  const body: Record<string, unknown> = {
+    id: CONFIG_ID,
+    label: '__config__',
+    email: null,
+    client_id: clientId,
+    refresh_token: null,
+    root_folder_name: 'Media Situs',
+    root_folder_id: null,
+    is_active: false,
+    enabled: false,
+  };
+  // Kolom yang tidak dikirim dibiarkan, jadi secret lama tidak terhapus.
+  if (clientSecret) body['client_secret'] = clientSecret;
+  await sbJson('/rest/v1/gdrive_accounts?on_conflict=id', {
+    admin: true,
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body,
+  });
+}
+
 /* ---------------- OAuth ---------------- */
 
 export const DRIVE_SCOPE = [

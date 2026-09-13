@@ -1,6 +1,8 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getPost, popularPosts, submitComment } from '@/lib/content.functions';
+import { getLikes, toggleLike } from '@/lib/user.functions';
+import { ensureUserToken, useUserSession } from '@/lib/useUserSession';
 import { AdSlot, PostCard, Sidebar, formatDate } from '@/components/site';
 import { abs } from '@/lib/site';
 
@@ -143,6 +145,8 @@ function Article() {
             </div>
           )}
 
+          <LikeShare postId={post.id} slug={post.slug} title={post.title} />
+
           <AdSlot slot="below_article" />
 
           {related.length > 0 && (
@@ -166,13 +170,131 @@ function Article() {
   );
 }
 
+function LikeShare({ postId, slug, title }: { postId: number; slug: string; title: string }) {
+  const session = useUserSession();
+  const [likes, setLikes] = useState<{ count: number; liked: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (session === undefined) return;
+    let alive = true;
+    (async () => {
+      const token = session ? await ensureUserToken() : '';
+      try {
+        const res = await getLikes({ data: token ? { postId, token } : { postId } });
+        if (alive) setLikes(res);
+      } catch {
+        if (alive) setLikes({ count: 0, liked: false });
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [postId, session]);
+
+  const url = abs(`/${slug}`);
+
+  async function onLike() {
+    if (!session) return;
+    setBusy(true);
+    try {
+      const token = await ensureUserToken();
+      const res = await toggleLike({ data: { token, postId } });
+      setLikes((cur) => ({
+        count: Math.max(0, (cur?.count ?? 0) + (res.liked ? 1 : -1)),
+        liked: res.liked,
+      }));
+    } catch {
+      /* biarkan tampilan apa adanya */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onShare() {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch {
+        /* pengguna membatalkan */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* abaikan */
+    }
+  }
+
+  return (
+    <div className="mt-8 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
+      {session ? (
+        <button
+          onClick={onLike}
+          disabled={busy}
+          className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
+            likes?.liked
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border hover:border-primary'
+          }`}
+        >
+          {likes?.liked ? '♥ Disukai' : '♡ Suka'} {likes ? `(${likes.count})` : ''}
+        </button>
+      ) : (
+        <Link
+          to="/masuk"
+          className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary"
+        >
+          ♡ Suka {likes ? `(${likes.count})` : ''} · masuk dulu
+        </Link>
+      )}
+
+      <button
+        onClick={onShare}
+        className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary"
+      >
+        Bagikan
+      </button>
+      <a
+        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`${title} ${url}`)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary"
+      >
+        WhatsApp
+      </a>
+      <a
+        href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary"
+      >
+        Facebook
+      </a>
+      {copied && <span className="text-sm text-primary">Tautan disalin!</span>}
+    </div>
+  );
+}
+
 function CommentSection({
   postId,
   comments,
 }: {
   postId: number;
-  comments: { id: number; author_name: string; content: string; created_at: string }[];
+  comments: {
+    id: number;
+    author_name: string;
+    content: string;
+    created_at: string;
+    avatar_url?: string | null;
+    is_member?: boolean;
+  }[];
 }) {
+  const session = useUserSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [content, setContent] = useState('');
@@ -185,10 +307,30 @@ function CommentSection({
       </h2>
       <ul className="space-y-4">
         {comments.map((c) => (
-          <li key={c.id} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-sm font-semibold">{c.author_name}</p>
-            <p className="text-xs text-muted-foreground">{formatDate(c.created_at)}</p>
-            <p className="mt-2 whitespace-pre-line text-sm">{c.content}</p>
+          <li key={c.id} className="flex gap-3 rounded-lg border border-border bg-card p-4">
+            {c.avatar_url ? (
+              <img
+                src={c.avatar_url}
+                alt={c.author_name}
+                className="h-9 w-9 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+                {c.author_name.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">
+                {c.author_name}
+                {c.is_member && (
+                  <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
+                    member
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground">{formatDate(c.created_at)}</p>
+              <p className="mt-2 whitespace-pre-line text-sm">{c.content}</p>
+            </div>
           </li>
         ))}
         {comments.length === 0 && (
@@ -196,13 +338,17 @@ function CommentSection({
         )}
       </ul>
 
+
       <form
         className="mt-6 space-y-3 rounded-lg border border-border bg-card p-4"
         onSubmit={async (e) => {
           e.preventDefault();
           setState('sending');
           try {
-            await submitComment({ data: { postId, name, email, content } });
+            const token = session ? await ensureUserToken() : '';
+            await submitComment({
+              data: token ? { postId, content, token } : { postId, name, email, content },
+            });
             setState('done');
             setName('');
             setEmail('');
@@ -213,22 +359,36 @@ function CommentSection({
         }}
       >
         <h3 className="font-display text-lg font-bold">Tinggalkan Komentar</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nama"
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email (opsional)"
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-        </div>
+        {session ? (
+          <p className="text-sm text-muted-foreground">
+            Berkomentar sebagai <span className="font-semibold text-foreground">{session.name || 'akun Anda'}</span>.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              <Link to="/masuk" className="text-primary underline">
+                Masuk
+              </Link>{' '}
+              agar nama dan foto profil Anda tampil otomatis, atau isi nama di bawah.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nama"
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email (opsional)"
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+          </>
+        )}
         <textarea
           required
           rows={4}

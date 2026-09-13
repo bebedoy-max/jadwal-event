@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { Category, PostCard as PostCardType } from '@/lib/content.functions';
+import { clearUserSession, useUserSession } from '@/lib/useUserSession';
 
 export type SiteData = {
   categories: Category[];
@@ -35,6 +36,59 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
   return <div ref={ref} className={`my-5 flex justify-center overflow-hidden ${className}`} />;
 }
 
+/* ----------------------------- Menu akun -------------------------------- */
+function AccountLink() {
+  const session = useUserSession();
+  const [open, setOpen] = useState(false);
+
+  if (!session)
+    return (
+      <Link
+        to="/masuk"
+        className="pill-glow shrink-0 rounded-full px-4 py-1.5 text-sm font-bold tracking-wide text-primary-foreground shadow-sm transition hover:scale-105 hover:shadow-md"
+      >
+        Masuk / Daftar
+      </Link>
+    );
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 font-medium opacity-90 hover:opacity-100"
+      >
+        {session.avatar ? (
+          <img src={session.avatar} alt="" className="h-5 w-5 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-foreground/20 text-[10px]">
+            {(session.name || 'A').charAt(0).toUpperCase()}
+          </span>
+        )}
+        <span className="max-w-24 truncate">{session.name || 'Akun'}</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-border bg-card text-foreground shadow-lg">
+          <Link to="/profil" className="block px-3 py-2 text-xs hover:bg-muted" onClick={() => setOpen(false)}>
+            Profil Saya
+          </Link>
+          <Link to="/paket" className="block px-3 py-2 text-xs hover:bg-muted" onClick={() => setOpen(false)}>
+            Paket & Harga
+          </Link>
+          <button
+            onClick={() => {
+              clearUserSession();
+              setOpen(false);
+            }}
+            className="block w-full px-3 py-2 text-left text-xs hover:bg-muted"
+          >
+            Keluar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* -------------------------------- Header -------------------------------- */
 export function Header() {
   const { categories, title } = useSiteData();
@@ -47,9 +101,7 @@ export function Header() {
       <div className="bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-1.5 text-xs">
           <span className="truncate">Informasi jadwal event, pameran, promo & lomba se-Indonesia</span>
-          <Link to="/admin" className="hidden shrink-0 opacity-90 hover:opacity-100 sm:block">
-            Masuk Admin
-          </Link>
+          <AccountLink />
         </div>
       </div>
 
@@ -151,9 +203,6 @@ export function Footer() {
               <Link to="/$slug" params={{ slug: 'beriklan-di-jadwal-event' }} className="hover:text-primary">
                 Beriklan / Advertorial
               </Link>
-            </li>
-            <li>
-              <Link to="/admin" className="hover:text-primary">Panel Admin</Link>
             </li>
             <li>
               <Link to="/privacy-policy" className="hover:text-primary">Kebijakan Privasi</Link>

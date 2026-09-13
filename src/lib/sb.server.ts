@@ -59,6 +59,18 @@ export async function sbList<T>(path: string, opts: Opts = {}) {
   return { data, total };
 }
 
+/** Verifikasi token pengguna biasa (bukan admin) dan kembalikan datanya. */
+export async function requireUser(token: string) {
+  if (!token) throw new Error('Silakan masuk terlebih dahulu.');
+  const res = await sbFetch('/auth/v1/user', { token });
+  if (!res.ok) throw new Error('Sesi berakhir, silakan masuk ulang.');
+  return (await res.json()) as {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, unknown>;
+  };
+}
+
 /** Verifikasi token pengguna dan pastikan dia admin. */
 export async function requireAdmin(token: string) {
   if (!token) throw new Error('Silakan login terlebih dahulu.');

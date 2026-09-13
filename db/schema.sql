@@ -215,3 +215,216 @@ grant all on public.media_assets to service_role;
 grant usage, select on sequence public.media_assets_id_seq to service_role;
 alter table public.gdrive_accounts enable row level security;
 alter table public.media_assets enable row level security;
+
+-- =====================================================================
+-- Akun pengguna: profil, paket langganan, pengajuan, dan suka artikel
+-- Jalankan blok ini di Supabase Studio > SQL Editor (aman diulang).
+-- =====================================================================
+
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text not null default '',
+  full_name text not null default '',
+  whatsapp text not null default '',
+  city text not null default '',
+  website text not null default '',
+  bio text not null default '',
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+grant select, update on public.profiles to authenticated;
+grant all on public.profiles to service_role;
+alter table public.profiles enable row level security;
+
+do $$ begin
+  create policy "own profile readable" on public.profiles
+    for select to authenticated using (auth.uid() = id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "own profile updatable" on public.profiles
+    for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+exception when duplicate_object then null; end $$;
+
+-- Profil dibuat otomatis saat pendaftaran user baru.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, display_name, full_name, avatar_url)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'full_name', split_part(coalesce(new.email,''), '@', 1)),
+    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    new.raw_user_meta_data->>'avatar_url'
+  )
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ---------- Paket langganan / iklan ----------------------------------
+create table if not exists public.plans (
+  id text primary key,
+  name text not null,
+  price bigint not null default 0,
+  currency text not null default 'IDR',
+  days integer not null default 30,
+  description text not null default '',
+  features text not null default '',
+  sort integer not null default 0,
+  active boolean not null default true
+);
+
+grant select on public.plans to anon, authenticated;
+grant all on public.plans to service_role;
+alter table public.plans enable row level security;
+do $$ begin
+  create policy "plans public" on public.plans
+    for select to anon, authenticated using (active = true);
+exception when duplicate_object then null; end $$;
+
+insert into public.plans (id, name, price, days, description, features, sort) values
+  ('free',      'Gratis',        0,      3650, 'Akses dasar: baca, komentar, suka, dan bagikan.', 'Komentar|Suka & bagikan|Simpan profil', 1),
+  ('pro',       'Pro Bulanan',   99000,  30,   'Fitur pro untuk penyelenggara event.', 'Tanpa iklan|Submit event prioritas|Badge Pro', 2),
+  ('pro_year',  'Pro Tahunan',   990000, 365,  'Hemat 2 bulan dibanding bulanan.', 'Semua fitur Pro|Prioritas dukungan', 3),
+  ('ads_basic', 'Iklan Banner',  500000, 30,   'Banner Anda tampil di slot sidebar selama 30 hari.', 'Slot sidebar|Laporan tayangan', 4),
+  ('advertorial','Advertorial',  750000, 3650, 'Artikel advertorial permanen beserta tautan.', 'Artikel khusus|Backlink|Bagikan ke media sosial', 5)
+on conflict (id) do nothing;
+
+-- ---------- Langganan aktif per user --------------------------------
+create table if not exists public.subscriptions (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  plan_id text not null default 'free' references public.plans(id),
+  status text not null default 'active',
+  started_at timestamptz not null default now(),
+  expires_at timestamptz
+);
+
+grant select on public.subscriptions to authenticated;
+grant all on public.subscriptions to service_role;
+alter table public.subscriptions enable row level security;
+do $$ begin
+  create policy "own subscription readable" on public.subscriptions
+    for select to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+-- ---------- Pengajuan paket / pembelian iklan -----------------------
+create table if not exists public.plan_orders (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  plan_id text not null references public.plans(id),
+  amount bigint not null default 0,
+  contact text not null default '',
+  note text not null default '',
+  status text not null default 'pending',
+  admin_note text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists plan_orders_user_idx on public.plan_orders (user_id, created_at desc);
+create index if not exists plan_orders_status_idx on public.plan_orders (status, created_at desc);
+
+grant select, insert on public.plan_orders to authenticated;
+grant usage, select on sequence public.plan_orders_id_seq to authenticated;
+grant all on public.plan_orders to service_role;
+alter table public.plan_orders enable row level security;
+do $$ begin
+  create policy "own orders readable" on public.plan_orders
+    for select to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "own orders insertable" on public.plan_orders
+    for insert to authenticated with check (auth.uid() = user_id and status = 'pending');
+exception when duplicate_object then null; end $$;
+
+-- ---------- Suka artikel --------------------------------------------
+create table if not exists public.post_likes (
+  post_id bigint not null references public.posts(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+create index if not exists post_likes_post_idx on public.post_likes (post_id);
+
+grant select, insert, delete on public.post_likes to authenticated;
+grant select on public.post_likes to anon;
+grant all on public.post_likes to service_role;
+alter table public.post_likes enable row level security;
+do $$ begin
+  create policy "likes public" on public.post_likes
+    for select to anon, authenticated using (true);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "own like insertable" on public.post_likes
+    for insert to authenticated with check (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "own like deletable" on public.post_likes
+    for delete to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+-- ---------- Komentar milik user terdaftar ---------------------------
+alter table public.comments add column if not exists user_id uuid references auth.users(id) on delete set null;
+
+-- =====================================================================
+-- Pembayaran: konfigurasi payment gateway + transaksi
+-- Jalankan di Supabase Studio > SQL Editor (aman diulang).
+-- =====================================================================
+
+create table if not exists public.payment_gateways (
+  id text primary key,                       -- aapay | midtrans | doku | ...
+  name text not null,
+  enabled boolean not null default false,
+  is_default boolean not null default false,
+  mode text not null default 'live',         -- live | sandbox
+  base_url text not null default '',
+  config jsonb not null default '{}'::jsonb, -- api_key, api_secret, webhook_secret, dll
+  updated_at timestamptz not null default now()
+);
+
+-- Berisi kredensial: hanya server (service_role) yang boleh mengakses.
+revoke all on public.payment_gateways from anon, authenticated;
+grant all on public.payment_gateways to service_role;
+alter table public.payment_gateways enable row level security;
+
+insert into public.payment_gateways (id, name, base_url, is_default) values
+  ('aapay',    'AAPay (QRIS)', 'https://aapay.web.id/api/public/v1', true),
+  ('midtrans', 'Midtrans',     'https://api.midtrans.com/v2',        false),
+  ('doku',     'DOKU',         'https://api.doku.com',               false)
+on conflict (id) do nothing;
+
+create table if not exists public.payments (
+  id bigserial primary key,
+  order_id bigint references public.plan_orders(id) on delete set null,
+  user_id uuid references auth.users(id) on delete set null,
+  gateway text not null default 'aapay',
+  provider_order_id text,
+  external_ref text,
+  amount bigint not null default 0,
+  final_amount bigint not null default 0,
+  unique_code integer,
+  status text not null default 'pending',   -- pending|paid|expired|cancelled|failed
+  qris_string text,
+  expired_at timestamptz,
+  paid_at timestamptz,
+  raw jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists payments_user_idx on public.payments (user_id, created_at desc);
+create index if not exists payments_provider_idx on public.payments (provider_order_id);
+create index if not exists payments_order_idx on public.payments (order_id);
+
+grant select on public.payments to authenticated;
+grant all on public.payments to service_role;
+grant usage, select on sequence public.payments_id_seq to service_role;
+alter table public.payments enable row level security;
+do $$ begin
+  create policy "own payments readable" on public.payments
+    for select to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;

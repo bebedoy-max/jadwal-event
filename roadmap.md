@@ -13,3 +13,8 @@
 - [ ] Buat user admin + baris di user_roles (role = admin)
 - [ ] Jalankan impor data
 - [ ] Jalankan blok SQL Google Drive (gdrive_accounts + media_assets) di Supabase
+- [x] Rapikan halaman Google Drive: pengaturan master tersembunyi, daftar akun, dan ringkasan data migrasi
+- [x] Tautan "Pengajuan Paket" di navigasi panel admin
+- [x] Tombol suka + bagikan (WhatsApp, Facebook, salin tautan) di halaman artikel
+- [x] Komentar tertaut akun yang sedang masuk (nama & foto otomatis, tamu tetap boleh)
+- [ ] Menunggu db/schema.sql dijalankan di Supabase (halaman /paket masih error selama tabel belum ada)

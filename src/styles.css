@@ -206,3 +206,18 @@
   outline: none;
 }
 .inp:focus { border-color: var(--primary); }
+
+@keyframes pill-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 oklch(0.55 0.21 26.5 / 0.45),
+      0 0 10px 1px oklch(0.55 0.21 26.5 / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 5px oklch(0.55 0.21 26.5 / 0),
+      0 0 18px 3px oklch(0.55 0.21 26.5 / 0.55);
+  }
+}
+.pill-glow {
+  animation: pill-glow 2.4s ease-in-out infinite;
+  background-color: var(--primary);
+}

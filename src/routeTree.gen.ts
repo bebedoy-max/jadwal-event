@@ -12,18 +12,28 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AturSandiRouteImport } from './routes/atur-sandi'
 import { Route as CariRouteImport } from './routes/cari'
+import { Route as MasukRouteImport } from './routes/masuk'
+import { Route as PaketRouteImport } from './routes/paket'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as ProfilRouteImport } from './routes/profil'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminDriveRouteImport } from './routes/admin.drive'
 import { Route as AdminIklanRouteImport } from './routes/admin.iklan'
 import { Route as AdminKomentarRouteImport } from './routes/admin.komentar'
+import { Route as AdminPembayaranRouteImport } from './routes/admin.pembayaran'
+import { Route as AdminPengajuanRouteImport } from './routes/admin.pengajuan'
+import { Route as AdminPenggunaRouteImport } from './routes/admin.pengguna'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as BayarIdRouteImport } from './routes/bayar.$id'
 import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
 import { Route as SitemapPartDotxmlRouteImport } from './routes/sitemap/$part[.]xml'
 import { Route as TagSlugRouteImport } from './routes/tag.$slug'
 import { Route as AdminTulisIdRouteImport } from './routes/admin.tulis.$id'
+import { Route as ApiPublicAapayWebhookRouteImport } from './routes/api/public/aapay-webhook'
 import { Route as ApiPublicDriveSyncRouteImport } from './routes/api/public/drive-sync'
 import { Route as ApiPublicGambarSplatRouteImport } from './routes/api/public/gambar.$'
 import { Route as ApiPublicGoogleDriveCallbackRouteImport } from './routes/api/public/google-drive/callback'
@@ -44,14 +54,34 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AturSandiRoute = AturSandiRouteImport.update({
+  id: '/atur-sandi',
+  path: '/atur-sandi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CariRoute = CariRouteImport.update({
   id: '/cari',
   path: '/cari',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MasukRoute = MasukRouteImport.update({
+  id: '/masuk',
+  path: '/masuk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaketRoute = PaketRouteImport.update({
+  id: '/paket',
+  path: '/paket',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
   id: '/privacy-policy',
   path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfilRoute = ProfilRouteImport.update({
+  id: '/profil',
+  path: '/profil',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -84,6 +114,31 @@ const AdminKomentarRoute = AdminKomentarRouteImport.update({
   path: '/komentar',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPembayaranRoute = AdminPembayaranRouteImport.update({
+  id: '/pembayaran',
+  path: '/pembayaran',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPengajuanRoute = AdminPengajuanRouteImport.update({
+  id: '/pengajuan',
+  path: '/pengajuan',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPenggunaRoute = AdminPenggunaRouteImport.update({
+  id: '/pengguna',
+  path: '/pengguna',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BayarIdRoute = BayarIdRouteImport.update({
+  id: '/bayar/$id',
+  path: '/bayar/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KategoriSlugRoute = KategoriSlugRouteImport.update({
   id: '/kategori/$slug',
   path: '/kategori/$slug',
@@ -103,6 +158,11 @@ const AdminTulisIdRoute = AdminTulisIdRouteImport.update({
   id: '/tulis/$id',
   path: '/tulis/$id',
   getParentRoute: () => AdminRoute,
+} as any)
+const ApiPublicAapayWebhookRoute = ApiPublicAapayWebhookRouteImport.update({
+  id: '/api/public/aapay-webhook',
+  path: '/api/public/aapay-webhook',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicDriveSyncRoute = ApiPublicDriveSyncRouteImport.update({
   id: '/api/public/drive-sync',
@@ -130,18 +190,28 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/admin': typeof AdminRouteWithChildren
+  '/atur-sandi': typeof AturSandiRoute
   '/cari': typeof CariRoute
+  '/masuk': typeof MasukRoute
+  '/paket': typeof PaketRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/profil': typeof ProfilRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
+  '/admin/pembayaran': typeof AdminPembayaranRoute
+  '/admin/pengajuan': typeof AdminPengajuanRoute
+  '/admin/pengguna': typeof AdminPenggunaRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/bayar/$id': typeof BayarIdRoute
   '/kategori/$slug': typeof KategoriSlugRoute
   '/sitemap/$part.xml': typeof SitemapPartDotxmlRoute
   '/tag/$slug': typeof TagSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
+  '/api/public/aapay-webhook': typeof ApiPublicAapayWebhookRoute
   '/api/public/drive-sync': typeof ApiPublicDriveSyncRoute
   '/api/public/gambar/$': typeof ApiPublicGambarSplatRoute
   '/api/public/google-drive/callback': typeof ApiPublicGoogleDriveCallbackRoute
@@ -150,18 +220,28 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/atur-sandi': typeof AturSandiRoute
   '/cari': typeof CariRoute
+  '/masuk': typeof MasukRoute
+  '/paket': typeof PaketRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/profil': typeof ProfilRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
+  '/admin/pembayaran': typeof AdminPembayaranRoute
+  '/admin/pengajuan': typeof AdminPengajuanRoute
+  '/admin/pengguna': typeof AdminPenggunaRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/bayar/$id': typeof BayarIdRoute
   '/kategori/$slug': typeof KategoriSlugRoute
   '/sitemap/$part.xml': typeof SitemapPartDotxmlRoute
   '/tag/$slug': typeof TagSlugRoute
   '/admin': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
+  '/api/public/aapay-webhook': typeof ApiPublicAapayWebhookRoute
   '/api/public/drive-sync': typeof ApiPublicDriveSyncRoute
   '/api/public/gambar/$': typeof ApiPublicGambarSplatRoute
   '/api/public/google-drive/callback': typeof ApiPublicGoogleDriveCallbackRoute
@@ -172,18 +252,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/admin': typeof AdminRouteWithChildren
+  '/atur-sandi': typeof AturSandiRoute
   '/cari': typeof CariRoute
+  '/masuk': typeof MasukRoute
+  '/paket': typeof PaketRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/profil': typeof ProfilRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/admin/drive': typeof AdminDriveRoute
   '/admin/iklan': typeof AdminIklanRoute
   '/admin/komentar': typeof AdminKomentarRoute
+  '/admin/pembayaran': typeof AdminPembayaranRoute
+  '/admin/pengajuan': typeof AdminPengajuanRoute
+  '/admin/pengguna': typeof AdminPenggunaRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/bayar/$id': typeof BayarIdRoute
   '/kategori/$slug': typeof KategoriSlugRoute
   '/sitemap/$part.xml': typeof SitemapPartDotxmlRoute
   '/tag/$slug': typeof TagSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tulis/$id': typeof AdminTulisIdRoute
+  '/api/public/aapay-webhook': typeof ApiPublicAapayWebhookRoute
   '/api/public/drive-sync': typeof ApiPublicDriveSyncRoute
   '/api/public/gambar/$': typeof ApiPublicGambarSplatRoute
   '/api/public/google-drive/callback': typeof ApiPublicGoogleDriveCallbackRoute
@@ -195,18 +285,28 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/admin'
+    | '/atur-sandi'
     | '/cari'
+    | '/masuk'
+    | '/paket'
     | '/privacy-policy'
+    | '/profil'
     | '/sitemap.xml'
     | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
+    | '/admin/pembayaran'
+    | '/admin/pengajuan'
+    | '/admin/pengguna'
+    | '/auth/callback'
+    | '/bayar/$id'
     | '/kategori/$slug'
     | '/sitemap/$part.xml'
     | '/tag/$slug'
     | '/admin/'
     | '/admin/tulis/$id'
+    | '/api/public/aapay-webhook'
     | '/api/public/drive-sync'
     | '/api/public/gambar/$'
     | '/api/public/google-drive/callback'
@@ -215,18 +315,28 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$slug'
+    | '/atur-sandi'
     | '/cari'
+    | '/masuk'
+    | '/paket'
     | '/privacy-policy'
+    | '/profil'
     | '/sitemap.xml'
     | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
+    | '/admin/pembayaran'
+    | '/admin/pengajuan'
+    | '/admin/pengguna'
+    | '/auth/callback'
+    | '/bayar/$id'
     | '/kategori/$slug'
     | '/sitemap/$part.xml'
     | '/tag/$slug'
     | '/admin'
     | '/admin/tulis/$id'
+    | '/api/public/aapay-webhook'
     | '/api/public/drive-sync'
     | '/api/public/gambar/$'
     | '/api/public/google-drive/callback'
@@ -236,18 +346,28 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/admin'
+    | '/atur-sandi'
     | '/cari'
+    | '/masuk'
+    | '/paket'
     | '/privacy-policy'
+    | '/profil'
     | '/sitemap.xml'
     | '/terms-of-service'
     | '/admin/drive'
     | '/admin/iklan'
     | '/admin/komentar'
+    | '/admin/pembayaran'
+    | '/admin/pengajuan'
+    | '/admin/pengguna'
+    | '/auth/callback'
+    | '/bayar/$id'
     | '/kategori/$slug'
     | '/sitemap/$part.xml'
     | '/tag/$slug'
     | '/admin/'
     | '/admin/tulis/$id'
+    | '/api/public/aapay-webhook'
     | '/api/public/drive-sync'
     | '/api/public/gambar/$'
     | '/api/public/google-drive/callback'
@@ -258,13 +378,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
   AdminRoute: typeof AdminRouteWithChildren
+  AturSandiRoute: typeof AturSandiRoute
   CariRoute: typeof CariRoute
+  MasukRoute: typeof MasukRoute
+  PaketRoute: typeof PaketRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  ProfilRoute: typeof ProfilRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  BayarIdRoute: typeof BayarIdRoute
   KategoriSlugRoute: typeof KategoriSlugRoute
   SitemapPartDotxmlRoute: typeof SitemapPartDotxmlRoute
   TagSlugRoute: typeof TagSlugRoute
+  ApiPublicAapayWebhookRoute: typeof ApiPublicAapayWebhookRoute
   ApiPublicDriveSyncRoute: typeof ApiPublicDriveSyncRoute
   ApiPublicGambarSplatRoute: typeof ApiPublicGambarSplatRoute
   ApiPublicGoogleDriveCallbackRoute: typeof ApiPublicGoogleDriveCallbackRoute
@@ -294,6 +421,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/atur-sandi': {
+      id: '/atur-sandi'
+      path: '/atur-sandi'
+      fullPath: '/atur-sandi'
+      preLoaderRoute: typeof AturSandiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cari': {
       id: '/cari'
       path: '/cari'
@@ -301,11 +435,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CariRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/masuk': {
+      id: '/masuk'
+      path: '/masuk'
+      fullPath: '/masuk'
+      preLoaderRoute: typeof MasukRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paket': {
+      id: '/paket'
+      path: '/paket'
+      fullPath: '/paket'
+      preLoaderRoute: typeof PaketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy-policy': {
       id: '/privacy-policy'
       path: '/privacy-policy'
       fullPath: '/privacy-policy'
       preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profil': {
+      id: '/profil'
+      path: '/profil'
+      fullPath: '/profil'
+      preLoaderRoute: typeof ProfilRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -350,6 +505,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminKomentarRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/pembayaran': {
+      id: '/admin/pembayaran'
+      path: '/pembayaran'
+      fullPath: '/admin/pembayaran'
+      preLoaderRoute: typeof AdminPembayaranRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pengajuan': {
+      id: '/admin/pengajuan'
+      path: '/pengajuan'
+      fullPath: '/admin/pengajuan'
+      preLoaderRoute: typeof AdminPengajuanRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pengguna': {
+      id: '/admin/pengguna'
+      path: '/pengguna'
+      fullPath: '/admin/pengguna'
+      preLoaderRoute: typeof AdminPenggunaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bayar/$id': {
+      id: '/bayar/$id'
+      path: '/bayar/$id'
+      fullPath: '/bayar/$id'
+      preLoaderRoute: typeof BayarIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kategori/$slug': {
       id: '/kategori/$slug'
       path: '/kategori/$slug'
@@ -377,6 +567,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/tulis/$id'
       preLoaderRoute: typeof AdminTulisIdRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/api/public/aapay-webhook': {
+      id: '/api/public/aapay-webhook'
+      path: '/api/public/aapay-webhook'
+      fullPath: '/api/public/aapay-webhook'
+      preLoaderRoute: typeof ApiPublicAapayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/drive-sync': {
       id: '/api/public/drive-sync'
@@ -413,6 +610,9 @@ interface AdminRouteChildren {
   AdminDriveRoute: typeof AdminDriveRoute
   AdminIklanRoute: typeof AdminIklanRoute
   AdminKomentarRoute: typeof AdminKomentarRoute
+  AdminPembayaranRoute: typeof AdminPembayaranRoute
+  AdminPengajuanRoute: typeof AdminPengajuanRoute
+  AdminPenggunaRoute: typeof AdminPenggunaRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminTulisIdRoute: typeof AdminTulisIdRoute
 }
@@ -421,6 +621,9 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDriveRoute: AdminDriveRoute,
   AdminIklanRoute: AdminIklanRoute,
   AdminKomentarRoute: AdminKomentarRoute,
+  AdminPembayaranRoute: AdminPembayaranRoute,
+  AdminPengajuanRoute: AdminPengajuanRoute,
+  AdminPenggunaRoute: AdminPenggunaRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminTulisIdRoute: AdminTulisIdRoute,
 }
@@ -431,13 +634,20 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
   AdminRoute: AdminRouteWithChildren,
+  AturSandiRoute: AturSandiRoute,
   CariRoute: CariRoute,
+  MasukRoute: MasukRoute,
+  PaketRoute: PaketRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
+  ProfilRoute: ProfilRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  BayarIdRoute: BayarIdRoute,
   KategoriSlugRoute: KategoriSlugRoute,
   SitemapPartDotxmlRoute: SitemapPartDotxmlRoute,
   TagSlugRoute: TagSlugRoute,
+  ApiPublicAapayWebhookRoute: ApiPublicAapayWebhookRoute,
   ApiPublicDriveSyncRoute: ApiPublicDriveSyncRoute,
   ApiPublicGambarSplatRoute: ApiPublicGambarSplatRoute,
   ApiPublicGoogleDriveCallbackRoute: ApiPublicGoogleDriveCallbackRoute,

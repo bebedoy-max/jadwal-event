@@ -1,7 +1,8 @@
 import { createFileRoute, Link, Outlet, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
-import { adminLogin } from '@/lib/admin.functions';
-import { clearToken, setToken, useAdminToken } from '@/lib/useAdminToken';
+import { useEffect, useState } from 'react';
+import { checkAdminRole } from '@/lib/admin.functions';
+import { clearToken, getToken, setToken } from '@/lib/useAdminToken';
+import { clearUserSession, ensureUserToken, useUserSession } from '@/lib/useUserSession';
 
 export const Route = createFileRoute('/admin')({
   ssr: false,
@@ -19,12 +20,65 @@ export const Route = createFileRoute('/admin')({
   component: AdminLayout,
 });
 
-function AdminLayout() {
-  const [token, setTok] = useAdminToken();
-  const navigate = useNavigate();
+type Gate = 'loading' | 'denied' | 'ok';
 
-  if (token === null) return <div className="p-10 text-center text-muted-foreground">Memuat…</div>;
-  if (!token) return <LoginForm onLogin={(t) => setTok(t)} />;
+function AdminLayout() {
+  const session = useUserSession();
+  const navigate = useNavigate();
+  const [gate, setGate] = useState<Gate>('loading');
+
+  useEffect(() => {
+    if (session === undefined) return;
+    if (!session) {
+      // Belum masuk: arahkan ke halaman login umum.
+      navigate({ to: '/masuk' });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await ensureUserToken();
+        await checkAdminRole({ data: { token } });
+        if (cancelled) return;
+        // Samakan token admin dengan sesi user agar halaman-halaman admin jalan.
+        if (getToken() !== token) setToken(token, session.refresh, Math.max(60, (session.exp - Date.now()) / 1000));
+        setGate('ok');
+      } catch {
+        if (!cancelled) setGate('denied');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, navigate]);
+
+  if (session === undefined || gate === 'loading')
+    return <div className="p-10 text-center text-muted-foreground">Memuat…</div>;
+
+  if (gate === 'denied')
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-secondary px-4 text-center">
+        <h1 className="font-display text-xl font-bold">Akses ditolak</h1>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Akun Anda tidak memiliki role admin. Hubungi pengelola situs bila ini keliru.
+        </p>
+        <div className="flex gap-3">
+          <Link to="/" className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-primary">
+            Kembali ke Beranda
+          </Link>
+          <button
+            onClick={() => {
+              clearToken();
+              clearUserSession();
+              navigate({ to: '/masuk' });
+            }}
+            className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-primary"
+          >
+            Ganti Akun
+          </button>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-background">
@@ -34,17 +88,21 @@ function AdminLayout() {
           <nav className="flex flex-wrap gap-3 text-sm">
             <Link to="/admin" className="hover:text-primary">Artikel</Link>
             <Link to="/admin/komentar" className="hover:text-primary">Komentar</Link>
+            <Link to="/admin/pengajuan" className="hover:text-primary">Pengajuan Paket</Link>
+            <Link to="/admin/pengguna" className="hover:text-primary">Pengguna</Link>
+            <Link to="/admin/pembayaran" className="hover:text-primary">Pembayaran</Link>
             <Link to="/admin/iklan" className="hover:text-primary">Iklan</Link>
             <Link to="/admin/drive" className="hover:text-primary">Google Drive</Link>
             <Link to="/" className="hover:text-primary">Lihat Situs</Link>
           </nav>
+          <span className="ml-auto text-sm text-muted-foreground">{session?.name}</span>
           <button
             onClick={() => {
               clearToken();
-              setTok('');
-              navigate({ to: '/admin' });
+              clearUserSession();
+              navigate({ to: '/' });
             }}
-            className="ml-auto rounded-md border border-border px-3 py-1.5 text-sm hover:border-primary"
+            className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-primary"
           >
             Keluar
           </button>
@@ -53,60 +111,6 @@ function AdminLayout() {
       <div className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </div>
-    </div>
-  );
-}
-
-function LoginForm({ onLogin }: { onLogin: (t: string) => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary px-4">
-      <form
-        className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-card p-6"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          setErr('');
-          try {
-            const res = await adminLogin({ data: { email, password } });
-            setToken(res.token, res.refresh, res.expiresIn);
-            onLogin(res.token);
-          } catch (error) {
-            setErr(error instanceof Error ? error.message : 'Gagal masuk.');
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <h1 className="font-display text-xl font-bold">Masuk Panel Admin</h1>
-        <input
-          required
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-        />
-        <input
-          required
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Kata sandi"
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-        />
-        {err && <p className="text-sm text-destructive">{err}</p>}
-        <button
-          disabled={busy}
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-        >
-          {busy ? 'Memproses…' : 'Masuk'}
-        </button>
-      </form>
     </div>
   );
 }

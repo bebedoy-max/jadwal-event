@@ -22,6 +22,14 @@ export const adminLogin = createServerFn({ method: 'POST' })
     };
   });
 
+/** Verifikasi bahwa token sesi user umum milik akun ber-role admin. */
+export const checkAdminRole = createServerFn({ method: 'POST' })
+  .inputValidator((d: { token: string }) => d)
+  .handler(async ({ data }) => {
+    await requireAdmin(data.token);
+    return { ok: true };
+  });
+
 /** Perpanjang sesi admin memakai refresh token. */
 export const adminRefresh = createServerFn({ method: 'POST' })
   .inputValidator((d: { refresh: string }) => d)
@@ -230,5 +238,109 @@ export const adminSaveAd = createServerFn({ method: 'POST' })
       headers: { Prefer: 'return=minimal' },
       body: { code: data.code, enabled: data.enabled },
     });
+    return { ok: true };
+  });
+
+/* --------------------------- Pengajuan paket ---------------------------- */
+
+export type AdminOrder = {
+  id: number;
+  user_id: string;
+  plan_id: string;
+  amount: number;
+  contact: string;
+  note: string;
+  status: string;
+  admin_note: string;
+  created_at: string;
+};
+
+export const adminListOrders = createServerFn({ method: 'POST' })
+  .inputValidator((d: { token: string; status?: string }) => d)
+  .handler(async ({ data }) => {
+    await requireAdmin(data.token);
+    const filter = data.status && data.status !== 'all' ? `&status=eq.${data.status}` : '';
+    const orders = await sbJson<AdminOrder[]>(
+      `/rest/v1/plan_orders?select=id,user_id,plan_id,amount,contact,note,status,admin_note,created_at&order=created_at.desc&limit=200${filter}`,
+      { admin: true },
+    );
+    const ids = [...new Set(orders.map((o) => o.user_id))];
+    const profiles = ids.length
+      ? await sbJson<{ id: string; display_name: string; whatsapp: string }[]>(
+          `/rest/v1/profiles?select=id,display_name,whatsapp&id=in.(${ids.join(',')})`,
+          { admin: true },
+        )
+      : [];
+    return orders.map((o) => ({
+      ...o,
+      user_name: profiles.find((p) => p.id === o.user_id)?.display_name ?? o.user_id.slice(0, 8),
+    }));
+  });
+
+/** Setujui / tolak / tandai lunas. Menyetujui mengaktifkan langganan user. */
+export const adminDecideOrder = createServerFn({ method: 'POST' })
+  .inputValidator(
+    (d: {
+      token: string;
+      id: number;
+      action: 'approve' | 'reject' | 'paid';
+      adminNote?: string;
+    }) => d,
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin(data.token);
+    const rows = await sbJson<
+      { id: number; user_id: string; plan_id: string }[]
+    >(`/rest/v1/plan_orders?select=id,user_id,plan_id&id=eq.${data.id}&limit=1`, { admin: true });
+    const order = rows[0];
+    if (!order) throw new Error('Pengajuan tidak ditemukan.');
+
+    const status = data.action === 'reject' ? 'rejected' : data.action === 'paid' ? 'paid' : 'approved';
+    await sbJson(`/rest/v1/plan_orders?id=eq.${data.id}`, {
+      admin: true,
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: {
+        status,
+        admin_note: (data.adminNote ?? '').slice(0, 500),
+        updated_at: new Date().toISOString(),
+      },
+    });
+
+    if (data.action !== 'reject') {
+      const plans = await sbJson<{ id: string; days: number }[]>(
+        `/rest/v1/plans?select=id,days&id=eq.${order.plan_id}&limit=1`,
+        { admin: true },
+      );
+      const days = plans[0]?.days ?? 30;
+      const expires =
+        days > 0 ? new Date(Date.now() + days * 86_400_000).toISOString() : null;
+      const existing = await sbJson<{ user_id: string }[]>(
+        `/rest/v1/subscriptions?select=user_id&user_id=eq.${order.user_id}&limit=1`,
+        { admin: true },
+      );
+      const body = {
+        user_id: order.user_id,
+        plan_id: order.plan_id,
+        status: 'active',
+        started_at: new Date().toISOString(),
+        expires_at: expires,
+      };
+      if (existing[0]) {
+        await sbJson(`/rest/v1/subscriptions?user_id=eq.${order.user_id}`, {
+          admin: true,
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body,
+        });
+      } else {
+        await sbJson('/rest/v1/subscriptions', {
+          admin: true,
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' },
+          body,
+        });
+      }
+    }
     return { ok: true };
   });

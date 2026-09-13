@@ -87,11 +87,34 @@ export const getPost = createServerFn({ method: 'GET' })
         )})&id=neq.${post.id}&order=published_at.desc&limit=6`,
       );
     }
-    const comments = await sbJson<
-      { id: number; author_name: string; content: string; created_at: string }[]
+    const rawComments = await sbJson<
+      {
+        id: number;
+        author_name: string;
+        content: string;
+        created_at: string;
+        user_id: string | null;
+      }[]
     >(
-      `/rest/v1/comments?select=id,author_name,content,created_at&post_id=eq.${post.id}&status=eq.approved&order=created_at.asc`,
+      `/rest/v1/comments?select=id,author_name,content,created_at,user_id&post_id=eq.${post.id}&status=eq.approved&order=created_at.asc`,
     );
+    const userIds = [...new Set(rawComments.map((c) => c.user_id).filter(Boolean))] as string[];
+    const authors = userIds.length
+      ? await sbJson<{ id: string; display_name: string | null; avatar_url: string | null }[]>(
+          `/rest/v1/profiles?select=id,display_name,avatar_url&id=in.(${userIds.join(',')})`,
+        ).catch(() => [])
+      : [];
+    const comments = rawComments.map((c) => {
+      const a = c.user_id ? authors.find((p) => p.id === c.user_id) : undefined;
+      return {
+        id: c.id,
+        author_name: a?.display_name || c.author_name,
+        content: c.content,
+        created_at: c.created_at,
+        avatar_url: a?.avatar_url ?? null,
+        is_member: Boolean(c.user_id),
+      };
+    });
     post.content = cleanArticleHtml(post.content);
     post.excerpt = cleanExcerpt(post.excerpt);
     return fixMediaUrls({ post, related, comments });
@@ -118,20 +141,39 @@ export const getAds = createServerFn({ method: 'GET' }).handler(async () =>
 );
 
 export const submitComment = createServerFn({ method: 'POST' })
-  .inputValidator((d: { postId: number; name: string; email?: string; content: string }) => {
-    if (!d.name?.trim() || !d.content?.trim()) throw new Error('Nama dan komentar wajib diisi.');
-    return d;
-  })
+  .inputValidator(
+    (d: { postId: number; name?: string; email?: string; content: string; token?: string }) => {
+      if (!d.content?.trim()) throw new Error('Komentar wajib diisi.');
+      if (!d.token && !d.name?.trim()) throw new Error('Nama dan komentar wajib diisi.');
+      return d;
+    },
+  )
   .handler(async ({ data }) => {
+    let userId: string | null = null;
+    let name = (data.name ?? '').trim().slice(0, 80);
+    let email = data.email?.trim().slice(0, 120) || null;
+
+    if (data.token) {
+      const { requireUser } = await import('./sb.server');
+      const user = await requireUser(data.token);
+      userId = user.id;
+      email = user.email ?? email;
+      const rows = await sbJson<{ display_name: string | null }[]>(
+        `/rest/v1/profiles?select=display_name&id=eq.${user.id}&limit=1`,
+      ).catch(() => []);
+      name = (rows[0]?.display_name || name || user.email?.split('@')[0] || 'Pengguna').slice(0, 80);
+    }
+
     await sbJson('/rest/v1/comments', {
       method: 'POST',
       headers: { Prefer: 'return=minimal' },
       body: {
         post_id: data.postId,
-        author_name: data.name.trim().slice(0, 80),
-        author_email: data.email?.trim().slice(0, 120) || null,
+        author_name: name,
+        author_email: email,
         content: data.content.trim().slice(0, 4000),
         status: 'pending',
+        ...(userId ? { user_id: userId } : {}),
       },
     });
     return { ok: true };

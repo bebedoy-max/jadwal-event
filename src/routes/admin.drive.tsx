@@ -1,30 +1,62 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  FileText,
+  FolderSync,
+  HardDrive,
+  Image as ImageIcon,
+  Plus,
+  Settings,
+  Video,
+} from 'lucide-react';
+import {
+  driveAddAccount,
   driveAuthUrl,
   driveList,
   driveMigrateBatch,
   driveSave,
   driveSetState,
-  driveSyncRun,
-  driveSyncStatus,
-  driveUpload,
+
   type DriveAccountView,
+  type DriveStorageSummary,
 } from '@/lib/gdrive.functions';
 import { ensureToken } from '@/lib/useAdminToken';
+import { Button } from '@/components/ui/button';
 
-export const Route = createFileRoute('/admin/drive')({ component: AdminDrive });
+export const Route = createFileRoute('/admin/drive')({
+  head: () => ({
+    meta: [
+      { title: 'Google Drive | Panel Admin JadwalEvent' },
+      { name: 'description', content: 'Kelola akun dan pemindahan media Google Drive JadwalEvent.' },
+      { name: 'robots', content: 'noindex' },
+      { property: 'og:title', content: 'Google Drive | Panel Admin JadwalEvent' },
+      { property: 'og:description', content: 'Kelola akun dan pemindahan media Google Drive JadwalEvent.' },
+      { property: 'og:type', content: 'website' },
+      { name: 'twitter:card', content: 'summary' },
+    ],
+  }),
+  component: AdminDrive,
+});
 
-type Form = { id?: string; label: string; client_id: string; client_secret: string; root_folder_name: string };
-
-type SyncStatus = Awaited<ReturnType<typeof driveSyncStatus>>;
-
-const EMPTY: Form = { label: 'Google Drive', client_id: '', client_secret: '', root_folder_name: 'Media Situs' };
+const EMPTY_STORAGE: DriveStorageSummary = {
+  images: 0,
+  videos: 0,
+  articles: 0,
+  others: 0,
+  files: 0,
+  total_size: 0,
+};
 
 function AdminDrive() {
   const [accounts, setAccounts] = useState<DriveAccountView[]>([]);
   const [redirectUri, setRedirectUri] = useState('');
-  const [form, setForm] = useState<Form>(EMPTY);
+  const [configured, setConfigured] = useState(false);
+  const [storage, setStorage] = useState<DriveStorageSummary>(EMPTY_STORAGE);
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -32,14 +64,6 @@ function AdminDrive() {
   const [toId, setToId] = useState('');
   const [migrating, setMigrating] = useState(false);
   const [progress, setProgress] = useState('');
-  const [syncing, setSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState('');
-  const [backupArticles, setBackupArticles] = useState(true);
-  const [status, setStatus] = useState<SyncStatus | null>(null);
-  const stopRef = useRef(false);
-
-  const active = accounts.find((a) => a.is_active && a.enabled);
-  const canSync = Boolean(active?.connected);
 
   const load = async () => {
     const token = await ensureToken();
@@ -50,19 +74,15 @@ function AdminDrive() {
     const res = await driveList({ data: { token } });
     setAccounts(res.accounts);
     setRedirectUri(res.redirectUri);
-  };
-
-  const loadStatus = async () => {
-    const token = await ensureToken();
-    if (!token) return;
-    setStatus(await driveSyncStatus({ data: { token } }));
+    setConfigured(res.configured);
+    setClientId(res.masterClientId);
+    setStorage(res.storage);
   };
 
   useEffect(() => {
     load().catch((e: unknown) =>
       setErr(e instanceof Error ? e.message : 'Gagal memuat data Google Drive.'),
     );
-    loadStatus().catch(() => undefined);
     const onMsg = (e: MessageEvent) => {
       if (e.origin === window.location.origin && e.data?.type === 'gdriveConnected') {
         setMsg('Akun Google Drive berhasil terhubung.');
@@ -87,22 +107,34 @@ function AdminDrive() {
     }
   };
 
-  const connect = (id: string) =>
+  const openConnectPopup = async (id: string) => {
+    const popup = window.open('', 'gdrive', 'width=520,height=680');
+    if (!popup) throw new Error('Popup diblokir. Izinkan popup lalu coba lagi.');
+    try {
+      const { url } = await driveAuthUrl({ data: { token: await ensureToken(), id } });
+      popup.location.href = url;
+    } catch (e) {
+      popup.close();
+      throw e;
+    }
+  };
+
+  const connect = (id: string) => run(() => openConnectPopup(id));
+
+  // Tambah akun: buat baris akun memakai kredensial master, lalu langsung buka login Google.
+  const addAccount = () =>
     run(async () => {
-      const popup = window.open('', 'gdrive', 'width=520,height=680');
-      if (!popup) throw new Error('Popup diblokir. Izinkan popup lalu coba lagi.');
-      try {
-        const { url } = await driveAuthUrl({ data: { token: await ensureToken(), id } });
-        popup.location.href = url;
-      } catch (e) {
-        popup.close();
-        throw e;
-      }
+      const { id } = await driveAddAccount({ data: { token: await ensureToken() } });
+      await openConnectPopup(id);
     });
 
   const migrate = async () => {
-    if (!fromId || !toId || fromId === toId) {
-      setErr('Pilih akun asal dan akun tujuan yang berbeda.');
+    if (!fromId || !toId) {
+      setErr('Pilih akun asal dan akun tujuan.');
+      return;
+    }
+    if (fromId === toId) {
+      setErr('Akun asal dan akun tujuan tidak boleh sama.');
       return;
     }
     if (!confirm('Pindahkan semua media ke akun tujuan? Proses bisa berjalan lama.')) return;
@@ -130,366 +162,169 @@ function AdminDrive() {
     }
   };
 
-  const syncAll = async (reset: boolean) => {
-    if (
-      reset &&
-      !confirm('Mulai pemindahan dari artikel pertama lagi? Berkas yang sudah ada tidak diunggah ulang.')
-    )
-      return;
-    setSyncing(true);
-    stopRef.current = false;
-    setErr('');
-    setMsg('');
-    setSyncProgress('Memulai…');
-    try {
-      let first = reset;
-      for (;;) {
-        const res = await driveSyncRun({
-          data: { token: await ensureToken(), reset: first, articles: backupArticles, batch: 6 },
-        });
-        first = false;
-        setStatus({
-          offset: res.offset,
-          total: res.total,
-          files: status?.files ?? 0,
-          done: res.done,
-          stats: res.stats,
-        });
-        setSyncProgress(
-          `${res.offset.toLocaleString('id-ID')}/${res.total.toLocaleString('id-ID')} artikel diproses…`,
-        );
-        if (res.stats.lastError) setErr(res.stats.lastError);
-        if (res.done) {
-          setMsg('Pemindahan selesai. Semua artikel sudah diproses.');
-          break;
-        }
-        if (stopRef.current) {
-          setMsg('Pemindahan dihentikan. Posisi tersimpan, tinggal klik "Lanjutkan pemindahan".');
-          break;
-        }
-      }
-      await loadStatus();
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Pemindahan gagal.');
-    } finally {
-      setSyncing(false);
-      setSyncProgress('');
-    }
+  const sourceAccount = accounts.find((account) => account.id === fromId);
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-xl font-bold">Penyimpanan Google Drive</h1>
-        <p className="text-sm text-muted-foreground">
-          Simpan gambar, video, dan berkas artikel di Google Drive, bukan di hosting. Alamat media di
-          situs tetap sama walau akun Drive diganti.
+      <header>
+        <h1 className="font-display text-2xl font-bold">Penyimpanan Google Drive</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Kelola akun penyimpanan situs dan pindahkan data antar-akun saat diperlukan.
         </p>
-      </div>
+      </header>
 
-      {/* Daftar akun */}
-      <div className="space-y-3">
-        {accounts.map((a) => (
-          <div key={a.id} className="rounded-lg border border-border bg-card p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="font-semibold">{a.label}</span>
-              <span className="rounded-full border border-border px-2 py-0.5 text-xs">
-                {a.connected ? (a.email ?? 'Terhubung') : 'Belum terhubung'}
-              </span>
-              {a.is_active && (
-                <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-                  Aktif
-                </span>
-              )}
-              <span className="text-xs text-muted-foreground">
-                Folder: {a.root_folder_name} · {a.file_count} berkas
-              </span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2 text-sm">
-              <button
-                disabled={busy}
-                onClick={() => connect(a.id)}
-                className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
-              >
-                {a.connected ? 'Hubungkan ulang' : 'Hubungkan'}
-              </button>
-              <button
-                disabled={busy || a.is_active}
-                onClick={() =>
-                  run(async () => {
-                    await driveSetState({ data: { token: await ensureToken(), id: a.id, action: 'activate' } });
-                  })
-                }
-                className="rounded-md border border-border px-3 py-1.5 disabled:opacity-50"
-              >
-                Jadikan aktif
-              </button>
-              <button
-                disabled={busy}
-                onClick={() =>
-                  setForm({
-                    id: a.id,
-                    label: a.label,
-                    client_id: a.client_id,
-                    client_secret: '',
-                    root_folder_name: a.root_folder_name,
-                  })
-                }
-                className="rounded-md border border-border px-3 py-1.5"
-              >
-                Ubah
-              </button>
-              <button
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    await driveSetState({ data: { token: await ensureToken(), id: a.id, action: 'disconnect' } });
-                  })
-                }
-                className="rounded-md border border-border px-3 py-1.5"
-              >
-                Putuskan
-              </button>
-              <button
-                disabled={busy || a.file_count > 0}
-                title={a.file_count > 0 ? 'Pindahkan dulu berkasnya' : ''}
-                onClick={() => {
-                  if (!confirm('Hapus akun ini dari daftar?')) return;
-                  void run(async () => {
-                    await driveSetState({ data: { token: await ensureToken(), id: a.id, action: 'delete' } });
-                  });
-                }}
-                className="rounded-md border border-border px-3 py-1.5 text-destructive disabled:opacity-50"
-              >
-                Hapus
-              </button>
-            </div>
-          </div>
-        ))}
-        {accounts.length === 0 && (
-          <p className="text-sm text-muted-foreground">Belum ada akun Google Drive.</p>
-        )}
-      </div>
-
-      {/* Form akun */}
-      <form
-        className="space-y-3 rounded-lg border border-border bg-card p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(async () => {
-            await driveSave({ data: { token: await ensureToken(), ...form } });
-            setForm(EMPTY);
-            setMsg('Pengaturan tersimpan.');
-          });
-        }}
-      >
-        <h2 className="font-semibold">{form.id ? 'Ubah akun' : 'Tambah akun Google Drive'}</h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Nama akun">
-            <input
-              value={form.label}
-              onChange={(e) => setForm({ ...form, label: e.target.value })}
-              className="inp"
-            />
-          </Field>
-          <Field label="Nama folder root di Drive">
-            <input
-              value={form.root_folder_name}
-              onChange={(e) => setForm({ ...form, root_folder_name: e.target.value })}
-              className="inp"
-            />
-          </Field>
-          <Field label="Google OAuth Client ID">
-            <input
-              required
-              value={form.client_id}
-              onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-              placeholder="xxxx.apps.googleusercontent.com"
-              className="inp"
-            />
-          </Field>
-          <Field label={`Google OAuth Client Secret${form.id ? ' (isi untuk mengganti)' : ''}`}>
-            <input
-              type="password"
-              value={form.client_secret}
-              onChange={(e) => setForm({ ...form, client_secret: e.target.value })}
-              className="inp"
-            />
-          </Field>
-          <Field label="Authorized redirect URI (daftarkan di Google Cloud Console)">
-            <input readOnly value={redirectUri} className="inp" onFocus={(e) => e.target.select()} />
-          </Field>
-        </div>
-        <div className="flex gap-2">
-          <button
-            disabled={busy}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground"
-          >
-            Simpan konfigurasi
-          </button>
-          {form.id && (
-            <button
-              type="button"
-              onClick={() => setForm(EMPTY)}
-              className="rounded-md border border-border px-4 py-1.5 text-sm"
-            >
-              Batal
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Cara setup: buka Google Cloud Console → APIs &amp; Services → Credentials → buat OAuth client
-          ID tipe Web application, aktifkan Google Drive API, tambahkan redirect URI di atas, lalu
-          tempel Client ID &amp; Secret di sini dan klik Hubungkan.
-        </p>
-      </form>
-
-      {/* Unggah uji coba */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="mb-2 font-semibold">Unggah media ke Drive aktif</h2>
-        <input
-          type="file"
-          className="text-sm"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            await run(async () => {
-              const buf = new Uint8Array(await file.arrayBuffer());
-              let bin = '';
-              for (let i = 0; i < buf.length; i += 8192) {
-                bin += String.fromCharCode(...buf.subarray(i, i + 8192));
-              }
-              const res = await driveUpload({
-                data: {
-                  token: await ensureToken(),
-                  name: file.name,
-                  mime: file.type,
-                  dataBase64: btoa(bin),
-                },
+      <details className="group rounded-lg border border-border bg-card">
+        <summary className="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+            <Settings className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Pengaturan Google master</span>
+            <span className="block text-sm text-muted-foreground">
+              {configured ? 'Sudah siap dan berlaku untuk semua akun' : 'Belum diatur — isi sebelum menambah akun'}
+            </span>
+          </span>
+          <span className={`hidden items-center gap-1.5 text-xs font-medium sm:flex ${configured ? 'text-primary' : 'text-destructive'}`}>
+            {configured && <CheckCircle2 className="size-4" />}
+            {configured ? 'Siap' : 'Perlu diatur'}
+          </span>
+          <ChevronDown className="size-5 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <form
+          className="space-y-4 border-t border-border p-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              await driveSave({
+                data: { token: await ensureToken(), client_id: clientId, client_secret: clientSecret },
               });
-              setMsg(`Berhasil diunggah. Alamat media: ${res.url}`);
+              setClientSecret('');
+              setMsg('Pengaturan Google master tersimpan.');
             });
-            e.target.value = '';
           }}
-        />
-      </div>
-
-      {/* Sinkronisasi semua media ke Drive */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="mb-1 font-semibold">Pindahkan semua isi situs ke Drive</h2>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Menyalin semua gambar, video, dan cadangan artikel ke akun Drive aktif
-          {active ? ` (${active.label})` : ''}. Proses berjalan bertahap dan selalu melanjutkan dari
-          posisi terakhir, jadi boleh dihentikan lalu diteruskan kapan saja.
-        </p>
-        {status && (
-          <div className="mb-3 rounded-md bg-muted p-3 text-sm">
-            <p>
-              Artikel diproses: <strong>{status.offset.toLocaleString('id-ID')}</strong> dari{' '}
-              {status.total.toLocaleString('id-ID')} · berkas di Drive:{' '}
-              <strong>{status.files.toLocaleString('id-ID')}</strong>
-            </p>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-background">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{
-                  width: `${status.total ? Math.min(100, (status.offset / status.total) * 100) : 0}%`,
-                }}
-              />
+        >
+          <p className="text-sm text-muted-foreground">
+            Client ID dan Secret hanya diatur sekali. Setelah itu, akun lain cukup ditambahkan melalui tombol login Google.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Google OAuth Client ID">
+              <input required value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="xxxx.apps.googleusercontent.com" className="inp" />
+            </Field>
+            <Field label={`Google OAuth Client Secret${configured ? ' (kosongkan bila tidak diganti)' : ''}`}>
+              <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} className="inp" />
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="Authorized redirect URI (daftarkan di Google Cloud Console)">
+                <input readOnly value={redirectUri} className="inp" onFocus={(e) => e.target.select()} />
+              </Field>
             </div>
-            {status.stats.updatedAt && (
-              <p className="mt-2 text-muted-foreground">
-                {status.stats.uploaded.toLocaleString('id-ID')} berkas baru ·{' '}
-                {status.stats.articles.toLocaleString('id-ID')} cadangan artikel ·{' '}
-                {status.stats.missing.toLocaleString('id-ID')} tidak ditemukan
-              </p>
-            )}
-            {status.done && <p className="mt-1 text-primary">Semua artikel sudah diproses.</p>}
+          </div>
+          <Button disabled={busy}>Simpan pengaturan</Button>
+        </form>
+      </details>
+
+      <section className="rounded-lg border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-display text-lg font-bold">Akun Google Drive</h2>
+            <p className="text-sm text-muted-foreground">Akun aktif menerima semua unggahan media baru.</p>
+          </div>
+          <Button disabled={busy || !configured} title={configured ? 'Tambah akun Google Drive' : 'Atur Google master terlebih dahulu'} onClick={() => void addAccount()}>
+            <Plus /> Tambah akun Google Drive
+          </Button>
+        </div>
+        {!configured && (
+          <div className="border-b border-border bg-accent px-4 py-3 text-sm text-accent-foreground">
+            Buka Pengaturan Google master di atas dan simpan konfigurasinya terlebih dahulu.
           </div>
         )}
-        <label className="mb-3 flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={backupArticles}
-            onChange={(e) => setBackupArticles(e.target.checked)}
-            disabled={syncing}
-          />
-          Simpan juga cadangan isi artikel (berkas HTML) di Drive
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <button
-            disabled={syncing || busy || !canSync}
-            title={canSync ? '' : 'Hubungkan dan aktifkan akun Google Drive dulu'}
-            onClick={() => void syncAll(false)}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground disabled:opacity-60"
-          >
-            {syncing ? 'Memindahkan…' : 'Lanjutkan pemindahan'}
-          </button>
-          {syncing && (
-            <button
-              onClick={() => {
-                stopRef.current = true;
-                setSyncProgress('Berhenti setelah putaran ini selesai…');
-              }}
-              className="rounded-md border border-border px-4 py-1.5 text-sm"
-            >
-              Hentikan
-            </button>
+        <div className="divide-y divide-border">
+          {accounts.map((a) => (
+            <div key={a.id} className="p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground"><HardDrive className="size-5" /></span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{a.label}</span>
+                      {a.is_active && <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">Aktif</span>}
+                    </div>
+                    <p className="truncate text-sm text-muted-foreground">{a.connected ? (a.email ?? 'Akun Google terhubung') : 'Belum login ke Google'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{a.file_count.toLocaleString('id-ID')} berkas · {formatSize(a.total_size)} · Folder {a.root_folder_name}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => connect(a.id)} disabled={busy}>{a.connected ? 'Hubungkan ulang' : 'Login Google'}</Button>
+                  <Button size="sm" variant="outline" disabled={busy || a.is_active || !a.connected} onClick={() => run(async () => { await driveSetState({ data: { token: await ensureToken(), id: a.id, action: 'activate' } }); })}>Jadikan aktif</Button>
+                  <Button size="sm" variant="outline" disabled={busy || !a.connected} onClick={() => run(async () => { await driveSetState({ data: { token: await ensureToken(), id: a.id, action: 'disconnect' } }); })}>Putuskan</Button>
+                  <Button size="sm" variant="ghost" disabled={busy || a.file_count > 0} title={a.file_count > 0 ? 'Pindahkan berkas akun ini terlebih dahulu' : 'Hapus akun'} onClick={() => { if (confirm('Hapus akun ini dari daftar?')) void run(async () => { await driveSetState({ data: { token: await ensureToken(), id: a.id, action: 'delete' } }); }); }} className="text-destructive hover:text-destructive">Hapus</Button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {accounts.length === 0 && (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              Belum ada akun Google Drive yang ditambahkan.
+            </div>
           )}
-          <button
-            disabled={syncing || busy || !canSync}
-            onClick={() => void syncAll(true)}
-            className="rounded-md border border-border px-4 py-1.5 text-sm disabled:opacity-60"
-          >
-            Ulang dari awal
-          </button>
         </div>
-        {!canSync && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            Tombol aktif setelah ada akun Drive yang terhubung ke Google dan berstatus aktif.
-          </p>
-        )}
-        {syncProgress && <p className="mt-2 text-sm text-muted-foreground">{syncProgress}</p>}
-      </div>
+      </section>
 
-      {/* Migrasi */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="mb-1 font-semibold">Pindah akun Google Drive</h2>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Salin seluruh berkas dari akun lama ke akun baru. Alamat media di artikel tidak berubah,
-          jadi semua gambar tetap tampil normal setelah pindah.
-        </p>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <select value={fromId} onChange={(e) => setFromId(e.target.value)} className="inp w-auto">
-            <option value="">Akun asal…</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label} ({a.file_count} berkas)
-              </option>
-            ))}
-          </select>
-          <span>→</span>
-          <select value={toId} onChange={(e) => setToId(e.target.value)} className="inp w-auto">
-            <option value="">Akun tujuan…</option>
-            {accounts
-              .filter((a) => a.connected)
-              .map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
-          </select>
-          <button
-            disabled={migrating || busy}
-            onClick={() => void migrate()}
-            className="rounded-md bg-primary px-4 py-1.5 text-primary-foreground disabled:opacity-60"
-          >
-            {migrating ? 'Memindahkan…' : 'Mulai migrasi'}
-          </button>
+      <section className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border p-4">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground"><FolderSync className="size-4" /></span>
+            <div>
+              <h2 className="font-display text-lg font-bold">Migrasi antar-akun</h2>
+              <p className="text-sm text-muted-foreground">Pindahkan seluruh data dari akun lama ke akun baru tanpa mengubah alamat media di artikel.</p>
+            </div>
+          </div>
         </div>
-        {progress && <p className="mt-2 text-sm text-muted-foreground">{progress}</p>}
-      </div>
+        <div className="space-y-5 p-4">
+          <div>
+            <p className="mb-3 text-sm font-medium">Data tersimpan saat ini</p>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Stat icon={<ImageIcon />} label="Gambar" value={storage.images} />
+              <Stat icon={<Video />} label="Video" value={storage.videos} />
+              <Stat icon={<FileText />} label="Artikel" value={storage.articles} />
+              <Stat icon={<HardDrive />} label="Total ukuran" value={formatSize(storage.total_size)} />
+            </div>
+            {storage.others > 0 && <p className="mt-2 text-xs text-muted-foreground">Termasuk {storage.others.toLocaleString('id-ID')} berkas lain.</p>}
+          </div>
+
+          <div className="grid items-end gap-3 md:grid-cols-[1fr_auto_1fr]">
+            <Field label="Akun asal">
+              <select value={fromId} onChange={(e) => setFromId(e.target.value)} className="inp">
+                <option value="">Pilih akun asal…</option>
+                {accounts.filter((a) => a.id !== toId).map((a) => <option key={a.id} value={a.id}>{a.email ?? a.label} ({a.file_count} berkas)</option>)}
+              </select>
+            </Field>
+            <ArrowRight className="mx-auto mb-2 hidden size-5 text-muted-foreground md:block" />
+            <Field label="Akun tujuan">
+              <select value={toId} onChange={(e) => setToId(e.target.value)} className="inp">
+                <option value="">Pilih akun tujuan…</option>
+                {accounts.filter((a) => a.connected && a.id !== fromId).map((a) => <option key={a.id} value={a.id}>{a.email ?? a.label}</option>)}
+              </select>
+            </Field>
+          </div>
+          {sourceAccount && (
+            <p className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground">
+              Akan dipindahkan: {sourceAccount.image_count.toLocaleString('id-ID')} gambar, {sourceAccount.video_count.toLocaleString('id-ID')} video, {sourceAccount.article_count.toLocaleString('id-ID')} artikel, total {formatSize(sourceAccount.total_size)}.
+            </p>
+          )}
+          <Button disabled={migrating || busy || !fromId || !toId || fromId === toId} onClick={() => void migrate()}>
+            <FolderSync /> {migrating ? 'Sedang memindahkan…' : 'Mulai migrasi'}
+          </Button>
+          {progress && <p className="text-sm text-muted-foreground">{progress}</p>}
+        </div>
+      </section>
 
       {msg && <p className="text-sm text-primary">{msg}</p>}
       {err && <p className="text-sm text-destructive">{err}</p>}
@@ -503,5 +338,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="mb-1 block text-muted-foreground">{label}</span>
       {children}
     </label>
+  );
+}
+
+function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-md border border-border bg-background p-3">
+      <span className="text-primary [&_svg]:size-5">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-xs text-muted-foreground">{label}</span>
+        <strong className="block truncate text-lg font-semibold">{typeof value === 'number' ? value.toLocaleString('id-ID') : value}</strong>
+      </span>
+    </div>
   );
 }

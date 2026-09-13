@@ -4,11 +4,14 @@ import { requireAdmin, sbJson, sbList } from './sb.server';
 import {
   activeAccount,
   authorizeUrl,
+  CONFIG_ID,
   downloadFile,
   getAccount,
+  getMasterConfig,
   insertAccount,
   listAccounts,
   patchAccount,
+  saveMasterConfig,
   uploadFile,
   upsertAsset,
   type DriveAccount,
@@ -34,9 +37,38 @@ export type DriveAccountView = {
   is_active: boolean;
   enabled: boolean;
   file_count: number;
+  image_count: number;
+  video_count: number;
+  article_count: number;
+  other_count: number;
+  total_size: number;
 };
 
-function view(a: DriveAccount, counts: Record<string, number>): DriveAccountView {
+export type DriveStorageSummary = {
+  images: number;
+  videos: number;
+  articles: number;
+  others: number;
+  files: number;
+  total_size: number;
+};
+
+type AssetSummaryRow = Pick<MediaAsset, 'account_id' | 'path' | 'mime' | 'size'>;
+
+function emptySummary(): DriveStorageSummary {
+  return { images: 0, videos: 0, articles: 0, others: 0, files: 0, total_size: 0 };
+}
+
+function addToSummary(summary: DriveStorageSummary, row: AssetSummaryRow) {
+  summary.files += 1;
+  summary.total_size += Number(row.size) || 0;
+  if (row.path.startsWith('artikel/') || row.mime === 'text/html') summary.articles += 1;
+  else if (row.mime.startsWith('image/')) summary.images += 1;
+  else if (row.mime.startsWith('video/')) summary.videos += 1;
+  else summary.others += 1;
+}
+
+function view(a: DriveAccount, summary: DriveStorageSummary): DriveAccountView {
   return {
     id: a.id,
     label: a.label,
@@ -47,61 +79,103 @@ function view(a: DriveAccount, counts: Record<string, number>): DriveAccountView
     connected: Boolean(a.refresh_token),
     is_active: a.is_active,
     enabled: a.enabled,
-    file_count: counts[a.id] ?? 0,
+    file_count: summary.files,
+    image_count: summary.images,
+    video_count: summary.videos,
+    article_count: summary.articles,
+    other_count: summary.others,
+    total_size: summary.total_size,
   };
 }
 
-async function fileCounts() {
-  const rows = await sbJson<{ account_id: string }[]>(
-    '/rest/v1/media_assets?select=account_id&limit=100000',
-    { admin: true },
-  );
-  const out: Record<string, number> = {};
-  for (const r of rows) out[r.account_id] = (out[r.account_id] ?? 0) + 1;
-  return out;
+async function storageSummaries() {
+  const total = emptySummary();
+  const byAccount: Record<string, DriveStorageSummary> = {};
+  // PostgREST membatasi hasil per permintaan (umumnya 1000 baris), jadi data
+  // dibaca bertahap agar jumlahnya benar untuk puluhan ribu berkas.
+  const page = 1000;
+  for (let offset = 0; offset < 500_000; offset += page) {
+    const rows = await sbJson<AssetSummaryRow[]>(
+      `/rest/v1/media_assets?select=account_id,path,mime,size&order=id.asc&limit=${page}&offset=${offset}`,
+      { admin: true },
+    );
+    for (const row of rows) {
+      addToSummary(total, row);
+      const accountSummary = byAccount[row.account_id] ?? emptySummary();
+      addToSummary(accountSummary, row);
+      byAccount[row.account_id] = accountSummary;
+    }
+    if (rows.length < page) break;
+  }
+  return { total, byAccount };
 }
+
 
 export const driveList = createServerFn({ method: 'POST' })
   .inputValidator((d: { token: string }) => d)
   .handler(async ({ data }) => {
     await requireAdmin(data.token);
-    const [accounts, counts] = await Promise.all([listAccounts(), fileCounts()]);
+    const [accounts, summaries] = await Promise.all([listAccounts(), storageSummaries()]);
+    const master = accounts.find((a) => a.id === CONFIG_ID);
+    // Cadangan: proyek lama menyimpan kredensial langsung di akunnya.
+    const fallback = accounts.find((a) => a.id !== CONFIG_ID && a.client_id && a.client_secret);
     return {
       redirectUri: `${origin()}/api/public/google-drive/callback`,
-      accounts: accounts.map((a) => view(a, counts)),
+      configured: Boolean(master?.client_id && master?.client_secret) || Boolean(fallback),
+      masterClientId: master?.client_id ?? fallback?.client_id ?? '',
+      storage: summaries.total,
+      accounts: accounts
+        .filter((a) => a.id !== CONFIG_ID)
+        .map((a) => view(a, summaries.byAccount[a.id] ?? emptySummary())),
     };
   });
 
+/**
+ * Simpan konfigurasi Google master (Client ID/Secret) — satu untuk semua akun.
+ * Kredensial baru juga disalin ke semua akun yang sudah ada.
+ */
 export const driveSave = createServerFn({ method: 'POST' })
-  .inputValidator(
-    (d: {
-      token: string;
-      id?: string;
-      label: string;
-      client_id: string;
-      client_secret?: string;
-      root_folder_name: string;
-    }) => {
-      if (!d.client_id?.trim()) throw new Error('Client ID wajib diisi.');
-      return d;
-    },
-  )
+  .inputValidator((d: { token: string; client_id: string; client_secret?: string }) => {
+    if (!d.client_id?.trim()) throw new Error('Client ID wajib diisi.');
+    return d;
+  })
   .handler(async ({ data }) => {
     await requireAdmin(data.token);
-    const body: Record<string, unknown> = {
-      label: data.label.trim() || 'Google Drive',
-      client_id: data.client_id.trim(),
-      root_folder_name: data.root_folder_name.trim() || 'Media Situs',
-    };
-    if (data.client_secret?.trim()) body['client_secret'] = data.client_secret.trim();
-    if (data.id) {
-      await patchAccount(data.id, body);
-      return { id: data.id };
+    const master = await getMasterConfig();
+    const secret = data.client_secret?.trim() || null;
+    if (!master?.client_secret && !secret) {
+      throw new Error('Client Secret wajib diisi pertama kali.');
     }
-    const existing = await listAccounts();
+    const clientId = data.client_id.trim();
+    await saveMasterConfig(clientId, secret);
+    const accounts = await listAccounts();
+    for (const a of accounts) {
+      if (a.id === CONFIG_ID) continue;
+      const body: Record<string, unknown> = { client_id: clientId };
+      if (secret) body['client_secret'] = secret;
+      await patchAccount(a.id, body);
+    }
+    return { ok: true };
+  });
+
+/** Tambah akun Google Drive baru memakai kredensial master, lalu tinggal Hubungkan. */
+export const driveAddAccount = createServerFn({ method: 'POST' })
+  .inputValidator((d: { token: string }) => d)
+  .handler(async ({ data }) => {
+    await requireAdmin(data.token);
+    const master = await getMasterConfig();
+    const all = await listAccounts();
+    const fallback = all.find((a) => a.id !== CONFIG_ID && a.client_id && a.client_secret);
+    const creds = master?.client_id && master.client_secret ? master : fallback;
+    if (!creds) {
+      throw new Error('Simpan dulu pengaturan Google master (Client ID & Secret).');
+    }
+    const existing = all.filter((a) => a.id !== CONFIG_ID);
     const acc = await insertAccount({
-      ...body,
-      client_secret: data.client_secret?.trim() ?? '',
+      label: `Google Drive ${existing.length + 1}`,
+      client_id: creds.client_id,
+      client_secret: creds.client_secret,
+      root_folder_name: 'Media Situs',
       is_active: existing.length === 0,
     });
     return { id: acc.id };
@@ -151,6 +225,8 @@ export const driveUpload = createServerFn({ method: 'POST' })
     await requireAdmin(data.token);
     const acc = await activeAccount();
     if (!acc) throw new Error('Belum ada akun Google Drive aktif.');
+    if (!acc.refresh_token) throw new Error('Akun Google Drive aktif belum terhubung ke Google.');
+
     const bin = atob(data.dataBase64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -185,10 +261,11 @@ export const driveMigrateBatch = createServerFn({ method: 'POST' })
       `/rest/v1/media_assets?select=id,path,drive_file_id,account_id,mime,size&account_id=eq.${from.id}&order=id.asc&limit=${limit}`,
       { admin: true },
     );
-    const remainingBefore = await sbJson<{ id: number }[]>(
-      `/rest/v1/media_assets?select=id&account_id=eq.${from.id}&limit=100000`,
+    const { total: remainingBefore } = await sbList<{ id: number }>(
+      `/rest/v1/media_assets?select=id&account_id=eq.${from.id}&limit=1`,
       { admin: true },
     );
+
 
     let moved = 0;
     const errors: string[] = [];
@@ -210,7 +287,7 @@ export const driveMigrateBatch = createServerFn({ method: 'POST' })
         errors.push(`${row.path}: ${e instanceof Error ? e.message : 'gagal'}`);
       }
     }
-    return { moved, remaining: Math.max(remainingBefore.length - moved, 0), errors };
+    return { moved, remaining: Math.max(remainingBefore - moved, 0), errors };
   });
 
 /* ---------------- Sinkronisasi seluruh media ke Drive ---------------- */
